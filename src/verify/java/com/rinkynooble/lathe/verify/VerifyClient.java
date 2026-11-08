@@ -4,6 +4,9 @@ import com.rinkynooble.lathe.Lathe;
 import com.rinkynooble.lathe.Material;
 import com.rinkynooble.lathe.Registration;
 import com.rinkynooble.lathe.Shape;
+import com.rinkynooble.lathe.block.CornerType;
+import com.rinkynooble.lathe.block.Eighth;
+import com.rinkynooble.lathe.block.LatheCornerBlock;
 import com.rinkynooble.lathe.block.LatheVerticalSlabBlock;
 import com.rinkynooble.lathe.block.LatheVerticalStairBlock;
 import com.rinkynooble.lathe.block.VerticalSlabType;
@@ -109,6 +112,7 @@ public final class VerifyClient {
         }
         STEPS.add(new Step("look at the glass from the other side", 40, () -> look(new Vec3(ORIGIN.getX() + 9, ORIGIN.getY() + 2.6, ORIGIN.getZ() + 5 * 6 - 4.2), new Vec3(ORIGIN.getX() + 9, ORIGIN.getY() + 0.2, ORIGIN.getZ() + 5 * 6), true)));
         STEPS.add(new Step("screenshot glass from behind", 3, () -> screenshot("lathe-glass-behind.png")));
+        addCornerSteps();
         // Placement through the real client: aim at the north strip of a stone block's top face, holding the slab.
         STEPS.add(new Step("aim to place", 20, () -> aimToPlace()));
         STEPS.add(new Step("screenshot placement outline", 5, () -> screenshot("lathe-outline-place.png")));
@@ -191,6 +195,15 @@ public final class VerifyClient {
         REPORT.check(!bottom.skipRendering(top, Direction.EAST), "a glass bottom slab shows its side against a top slab (they don't cover each other)");
         REPORT.check(bottom.skipRendering(source, Direction.DOWN), "a glass slab hides its bottom on a glass block");
         REPORT.check(stairs.skipRendering(stairs.setValue(StairBlock.FACING, Direction.NORTH), Direction.EAST), "two glass stairs side by side hide the faces between them");
+        Block glassCorner = glass.block(Shape.CORNER);
+        REPORT.check(glassCorner != null, "the test rules have corners for tintedglass_blockz_1");
+        if (glassCorner != null) {
+            BlockState inner = glassCorner.defaultBlockState().setValue(LatheCornerBlock.EIGHTH, Eighth.TOP_SOUTH_EAST).setValue(LatheCornerBlock.TYPE, CornerType.INNER);
+            BlockState outer = glassCorner.defaultBlockState().setValue(LatheCornerBlock.EIGHTH, Eighth.TOP_NORTH_WEST).setValue(LatheCornerBlock.TYPE, CornerType.OUTER_UD);
+            REPORT.check(inner.skipRendering(source, Direction.WEST), "a glass inner corner hides its full side against the glass block");
+            REPORT.check(outer.skipRendering(bottom, Direction.EAST), "a glass outer corner hides its half side against a glass bottom slab");
+            REPORT.check(!outer.skipRendering(bottom, Direction.WEST), "a glass outer corner shows its side with the eighth against a bottom slab (not covered)");
+        }
         BlockState stoneSlab = stone.block(Shape.SLAB).defaultBlockState();
         REPORT.check(!stoneSlab.skipRendering(stoneSlab, Direction.EAST), "an opaque source's slabs don't use glass face hiding");
     }
@@ -274,6 +287,176 @@ public final class VerifyClient {
             for (Direction d : Direction.Plane.HORIZONTAL) states.add(vstairs.defaultBlockState().setValue(LatheVerticalStairBlock.FACING, d));
         }
         return states;
+    }
+
+    // ---- Corners ----
+
+    /** Where the corner galleries start: one per material with corners, 4 rows (types) of 8 (eighths). */
+    private static BlockPos cornerGallery(int index) {
+        return ORIGIN.offset(-36, 0, 8 + index * 12);
+    }
+
+    private static List<Material> cornerMaterials() {
+        List<Material> materials = new ArrayList<>();
+        for (String path : GALLERY) {
+            Material material = Registration.MATERIALS.get(new ResourceLocation("betterblockz", path));
+            if (material != null && material.has(Shape.CORNER)) materials.add(material);
+        }
+        return materials;
+    }
+
+    private static void buildCornerGallery() {
+        ServerLevel level = server().overworld();
+        server().execute(() -> {
+            List<Material> materials = cornerMaterials();
+            REPORT.check(materials.size() >= 3, "the test rules have corners for three gallery blocks (got " + materials.size() + ")");
+            for (int k = 0; k < materials.size(); k++) {
+                Material material = materials.get(k);
+                Block corner = material.block(Shape.CORNER);
+                BlockPos start = cornerGallery(k);
+                boolean glass = material.sourceId.getPath().startsWith("tintedglass");
+                for (int x = -2; x <= 16; x++) {
+                    for (int z = -2; z <= 8; z++) {
+                        BlockState floor = glass ? Blocks.RED_WOOL.defaultBlockState() : Blocks.SMOOTH_STONE.defaultBlockState();
+                        level.setBlock(start.offset(x, -1, z), floor, 18);
+                    }
+                }
+                for (CornerType type : CornerType.values()) {
+                    for (Eighth eighth : Eighth.values()) {
+                        BlockState state = corner.defaultBlockState().setValue(LatheCornerBlock.EIGHTH, eighth).setValue(LatheCornerBlock.TYPE, type);
+                        level.setBlock(start.offset(eighth.ordinal() * 2, 0, type.ordinal() * 2), state, 18);
+                    }
+                }
+            }
+        });
+    }
+
+    /** The user's screenshot, three times: the gap, then the gap to fill with an outer and an inner corner. */
+    private static BlockPos cornerScene(int copy) {
+        return ORIGIN.offset(-30 + copy * 5, 2, -8);
+    }
+
+    private static void buildCornerScenes() {
+        ServerLevel level = server().overworld();
+        Material material = lablink();
+        BlockState stairs = material.block(Shape.STAIRS).defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH).setValue(StairBlock.HALF, Half.TOP);
+        BlockState vstairs = material.block(Shape.VSTAIRS).defaultBlockState().setValue(LatheVerticalStairBlock.FACING, Direction.EAST);
+        server().execute(() -> {
+            for (int copy = 0; copy < 3; copy++) {
+                BlockPos gap = cornerScene(copy);
+                for (int dx = -3; dx <= 2; dx++) {
+                    for (int dy = -3; dy <= 2; dy++) {
+                        level.setBlock(gap.offset(dx, dy, -1), Blocks.STONE_BRICKS.defaultBlockState(), 18);
+                        level.setBlock(gap.offset(dx, dy, 0), Blocks.AIR.defaultBlockState(), 18);
+                        level.setBlock(gap.offset(dx, dy, 1), Blocks.AIR.defaultBlockState(), 18);
+                    }
+                    level.setBlock(gap.offset(dx, 1, 0), Blocks.GRASS_BLOCK.defaultBlockState(), 18);
+                    level.setBlock(gap.offset(dx, -3, 0), Blocks.SMOOTH_STONE.defaultBlockState(), 18);
+                    level.setBlock(gap.offset(dx, -3, 1), Blocks.SMOOTH_STONE.defaultBlockState(), 18);
+                    level.setBlock(gap.offset(dx, -3, 2), Blocks.SMOOTH_STONE.defaultBlockState(), 18);
+                }
+                level.setBlock(gap.west(), stairs, 18);
+                level.setBlock(gap.west(2), stairs, 18);
+                level.setBlock(gap.below(), vstairs, 18);
+                level.setBlock(gap.below(2), vstairs, 18);
+                // Something to stand on in front of it (a barrier: not drawn).
+                level.setBlock(standingSpot(copy).below(), Blocks.BARRIER.defaultBlockState(), 18);
+            }
+        });
+    }
+
+    /** The feet of a player standing in front of a scene, off to the east of the gap. */
+    private static BlockPos standingSpot(int copy) {
+        return cornerScene(copy).offset(1, -1, 3);
+    }
+
+    /** Stands the player in front of a scene, sneaking or not, aiming at the wall's face in the gap. */
+    private static void standBeforeScene(int copy, boolean sneaking) {
+        Minecraft mc = Minecraft.getInstance();
+        mc.options.hideGui = false;
+        mc.options.keyShift.setDown(sneaking);
+        BlockPos gap = cornerScene(copy);
+        BlockPos spot = standingSpot(copy);
+        Vec3 feet = new Vec3(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.2);
+        Vec3 eye = feet.add(0, sneaking ? 1.27 : 1.62, 0);
+        Vec3 target = new Vec3(gap.getX() + 0.5, gap.getY() + 0.5, gap.getZ());
+        Vec3 d = target.subtract(eye);
+        float yaw = (float) (Math.toDegrees(Math.atan2(d.z, d.x)) - 90.0);
+        float pitch = (float) -Math.toDegrees(Math.atan2(d.y, Math.sqrt(d.x * d.x + d.z * d.z)));
+        mc.player.getInventory().selected = 0;
+        server().execute(() -> {
+            ServerPlayer player = server().getPlayerList().getPlayers().get(0);
+            player.setGameMode(GameType.CREATIVE);
+            player.getAbilities().flying = false;
+            player.onUpdateAbilities();
+            player.teleportTo(server().overworld(), feet.x, feet.y, feet.z, yaw, pitch);
+            player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(lablink().items.get(Shape.CORNER), 16));
+        });
+    }
+
+    private static void placeInScene(int copy) {
+        Minecraft mc = Minecraft.getInstance();
+        HitResult hit = mc.hitResult;
+        BlockPos wall = cornerScene(copy).north();
+        REPORT.check(hit instanceof BlockHitResult b && b.getBlockPos().equals(wall) && b.getDirection() == Direction.SOUTH,
+                "the client aims at the wall's face in gap " + copy + " (got " + (hit instanceof BlockHitResult b ? b.getBlockPos() + " " + b.getDirection() : hit) + ")");
+        REPORT.check(mc.player.isShiftKeyDown() == (copy == 2), "the client is " + (copy == 2 ? "" : "not ") + "sneaking");
+        if (hit instanceof BlockHitResult blockHit) mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, blockHit);
+    }
+
+    private static void checkScene(int copy, Eighth eighth, CornerType type) {
+        Minecraft.getInstance().options.keyShift.setDown(false);
+        BlockPos gap = cornerScene(copy);
+        BlockState placed = server().overworld().getBlockState(gap);
+        Block corner = lablink().block(Shape.CORNER);
+        boolean ok = placed.is(corner) && placed.getValue(LatheCornerBlock.EIGHTH) == eighth && placed.getValue(LatheCornerBlock.TYPE) == type;
+        REPORT.check(ok, "the client placed " + type + " " + eighth + " in gap " + copy + " (got " + placed + ")");
+        BlockState client = Minecraft.getInstance().level.getBlockState(gap);
+        REPORT.check(client.equals(placed), "the client agrees (" + client + ")");
+    }
+
+    private static void addCornerSteps() {
+        STEPS.add(new Step("build the corner gallery and scenes", 10, () -> {
+            buildCornerGallery();
+            buildCornerScenes();
+        }));
+        // The 32 pieces of each material, from the south and from the north, in two halves.
+        for (int k = 0; k < 3; k++) {
+            int index = k;
+            for (boolean fromNorth : new boolean[]{false, true}) {
+                String name = "lathe-corners" + k + (fromNorth ? "-north" : "-south") + ".png";
+                STEPS.add(new Step("look at corner gallery " + k + (fromNorth ? " from the north" : " from the south"), 40, () -> {
+                    BlockPos start = cornerGallery(index);
+                    double cx = start.getX() + 7.5;
+                    double cz = start.getZ() + 3.5;
+                    double side = fromNorth ? -1 : 1;
+                    look(new Vec3(cx, start.getY() + 6.0, cz + side * 8.5), new Vec3(cx, start.getY(), cz), true);
+                }));
+                STEPS.add(new Step("screenshot " + name, 3, () -> screenshot(name)));
+            }
+        }
+        // The screenshot's gap, filled through the real client: an outer corner, then (sneaking) an inner one.
+        STEPS.add(new Step("stand before gap 1", 30, () -> standBeforeScene(1, false)));
+        STEPS.add(new Step("screenshot outer corner outline", 5, () -> screenshot("lathe-corner-outline-outer.png")));
+        STEPS.add(new Step("place the outer corner", 10, () -> placeInScene(1)));
+        STEPS.add(new Step("check the outer corner", 1, () -> checkScene(1, Eighth.TOP_SOUTH_WEST, CornerType.OUTER_NS)));
+        STEPS.add(new Step("stand before gap 2, sneaking", 30, () -> standBeforeScene(2, true)));
+        STEPS.add(new Step("screenshot inner corner outline", 5, () -> screenshot("lathe-corner-outline-inner.png")));
+        STEPS.add(new Step("place the inner corner", 10, () -> placeInScene(2)));
+        STEPS.add(new Step("check the inner corner", 1, () -> checkScene(2, Eighth.BOTTOM_SOUTH_EAST, CornerType.INNER)));
+        STEPS.add(new Step("look at the three scenes", 40, () -> {
+            BlockPos middle = cornerScene(1);
+            look(new Vec3(middle.getX() + 0.5, middle.getY() + 0.5, middle.getZ() + 9.5), new Vec3(middle.getX() + 0.5, middle.getY() - 0.8, middle.getZ()), true);
+        }));
+        STEPS.add(new Step("screenshot the three scenes", 3, () -> screenshot("lathe-corner-scenes.png")));
+        for (int copy = 1; copy < 3; copy++) {
+            int c = copy;
+            STEPS.add(new Step("look at scene " + copy + " up close", 40, () -> {
+                BlockPos gap = cornerScene(c);
+                look(new Vec3(gap.getX() + 2.3, gap.getY() + 0.3, gap.getZ() + 2.6), new Vec3(gap.getX() + 0.3, gap.getY() - 0.3, gap.getZ() + 0.2), true);
+            }));
+            STEPS.add(new Step("screenshot scene " + copy, 3, () -> screenshot("lathe-corner-scene" + c + ".png")));
+        }
     }
 
     private static BlockPos placeBase() {

@@ -143,7 +143,7 @@ public final class Rules {
                 }
                 target = token.toLowerCase(Locale.ROOT);
             } else {
-                problems.add(where + ": unknown word '" + token + "' (shapes are slab, vslab, stairs, vstairs)");
+                problems.add(where + ": unknown word '" + token + "' (shapes are " + Shape.words() + ")");
             }
         }
         if (target == null) {
@@ -156,7 +156,7 @@ public final class Rules {
             return null;
         }
         if (shapes.isEmpty()) {
-            problems.add(where + ": no shapes for " + target + " (slab, vslab, stairs, vstairs); line skipped");
+            problems.add(where + ": no shapes for " + target + " (" + Shape.words() + "); line skipped");
             return null;
         }
         return new Line(file, number, shapes, target, glob ? Line.compile(target) : null, nocombine, textures);
@@ -179,6 +179,8 @@ public final class Rules {
             #   vslab    vertical slab
             #   stairs   stairs
             #   vstairs  vertical stairs: a full-height block with one vertical quarter missing
+            #   corners  corner pieces that join stairs and vertical stairs: a block minus one eighth,
+            #            or half a block plus one eighth (32 pieces in one block, chosen as you place)
             #
             # Options after the block:
             #   nocombine            two slabs of this block never make a double slab by hand
@@ -189,7 +191,7 @@ public final class Rules {
             # The shapes are new blocks, so the client and the server need the same rules.
             # Removing a rule removes its blocks from every world that has them.
             #
-            # slab stairs vslab vstairs minecraft:calcite
+            # slab stairs vslab vstairs corners minecraft:calcite
             # slab vslab minecraft:*_concrete
             # slab vstairs minecraft:glass nocombine
             """;

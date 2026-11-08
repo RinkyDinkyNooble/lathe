@@ -60,7 +60,7 @@ public final class DataGen {
                 switch (shape) {
                     case SLAB -> blockTags.computeIfAbsent(new ResourceLocation("slabs"), k -> new ArrayList<>()).add(id.toString());
                     case STAIRS -> blockTags.computeIfAbsent(new ResourceLocation("stairs"), k -> new ArrayList<>()).add(id.toString());
-                    case VSLAB, VSTAIRS -> blockTags.computeIfAbsent(new ResourceLocation("lostcities", "rotatable"), k -> new ArrayList<>()).add(id.toString());
+                    case VSLAB, VSTAIRS, CORNER -> blockTags.computeIfAbsent(new ResourceLocation("lostcities", "rotatable"), k -> new ArrayList<>()).add(id.toString());
                 }
                 for (String tag : sourceToolTags.getOrDefault(material.sourceId, Set.of())) {
                     blockTags.computeIfAbsent(new ResourceLocation(tag), k -> new ArrayList<>()).add(id.toString());

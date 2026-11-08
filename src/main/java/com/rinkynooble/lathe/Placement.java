@@ -1,11 +1,14 @@
 package com.rinkynooble.lathe;
 
+import com.rinkynooble.lathe.block.CornerType;
+import com.rinkynooble.lathe.block.Eighth;
 import com.rinkynooble.lathe.block.LatheVerticalSlabBlock;
 import com.rinkynooble.lathe.block.ShapeBlock;
 import com.rinkynooble.lathe.item.LatheSlabItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -136,5 +139,70 @@ public final class Placement {
         if (!(context.getItemInHand().getItem() instanceof LatheSlabItem item) || item.material() != material) return false;
         Direction existing = pieceOf(material, state);
         return existing != null && piece(context, material) == existing.getOpposite();
+    }
+
+    // ---- Corners ----
+
+    /**
+     * A neighbour's face profile pushed through this block: the eighths of this block lined up with the eighths of
+     * the neighbour on {@code side} that touch the shared face. 0 when that profile is empty or the whole face, which
+     * says nothing about a corner.
+     */
+    public static int prism(int neighbourMask, Direction side) {
+        int touching = neighbourMask & Octants.half(side.getOpposite());
+        int count = Integer.bitCount(touching);
+        if (count == 0 || count == 4) return 0;
+        int flip = Octants.flip(side.getAxis());
+        int prism = 0;
+        for (int i = 0; i < 8; i++) {
+            if ((touching & (1 << i)) != 0) prism |= (1 << i) | (1 << (i ^ flip));
+        }
+        return prism;
+    }
+
+    /**
+     * The piece the neighbours of {@code pos} call for: where their partial faces' prisms overlap, or (with
+     * {@code union}) everything any of them covers. -1 when no neighbour has a partial face toward {@code pos}.
+     */
+    public static int cornerFromNeighbours(BlockGetter level, BlockPos pos, boolean union) {
+        int result = union ? 0 : Octants.FULL;
+        boolean any = false;
+        for (Direction side : Direction.values()) {
+            BlockPos at = pos.relative(side);
+            int prism = prism(maskOf(level.getBlockState(at), level, at), side);
+            if (prism == 0) continue;
+            any = true;
+            result = union ? result | prism : result & prism;
+        }
+        return any ? result : -1;
+    }
+
+    /** The eighths any block fills, Lathe's own or another mod's. */
+    public static int maskOf(BlockState state, BlockGetter level, BlockPos pos) {
+        if (state.getBlock() instanceof ShapeBlock) return ShapeBlock.mask(state);
+        if (state.isAir()) return 0;
+        return Octants.maskOf(state.getShape(level, pos));
+    }
+
+    /**
+     * The corner's eighth when the neighbours don't decide: the piece's bulk sits on the clicked face, as vanilla
+     * stairs do, so the eighth is on the far side of the block, in the quarter of the face the player aims at.
+     *
+     * @param face  the face clicked
+     * @param local the hit, relative to the block the corner goes into
+     */
+    public static Eighth cornerEighthByAim(Direction face, Vec3 local) {
+        int[] xyz = new int[3];
+        for (Direction.Axis axis : Direction.Axis.values()) {
+            xyz[axis.ordinal()] = axis == face.getAxis()
+                    ? (face.getAxisDirection() == Direction.AxisDirection.POSITIVE ? 1 : 0)
+                    : (local.get(axis) < 0.5 ? 0 : 1);
+        }
+        return Eighth.of(xyz[0], xyz[1], xyz[2]);
+    }
+
+    /** The corner's kind when the neighbours don't decide: inner when sneaking, else the half on the clicked face. */
+    public static CornerType cornerTypeByAim(Direction face, boolean sneaking) {
+        return sneaking ? CornerType.INNER : CornerType.outer(face.getAxis());
     }
 }

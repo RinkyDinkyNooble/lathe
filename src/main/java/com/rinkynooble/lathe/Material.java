@@ -37,7 +37,7 @@ public final class Material {
     }
 
     public ResourceLocation id(Shape shape) {
-        return new ResourceLocation(Lathe.MOD_ID, baseName() + "_" + shape.word);
+        return new ResourceLocation(Lathe.MOD_ID, baseName() + "_" + shape.suffix);
     }
 
     public Block block(Shape shape) {

@@ -10,6 +10,9 @@ import com.rinkynooble.lathe.Material;
 import com.rinkynooble.lathe.Octants;
 import com.rinkynooble.lathe.Registration;
 import com.rinkynooble.lathe.Shape;
+import com.rinkynooble.lathe.block.CornerType;
+import com.rinkynooble.lathe.block.Eighth;
+import com.rinkynooble.lathe.block.LatheCornerBlock;
 import com.rinkynooble.lathe.block.LatheVerticalSlabBlock;
 import com.rinkynooble.lathe.block.LatheVerticalStairBlock;
 import com.rinkynooble.lathe.pack.ModResources;
@@ -107,6 +110,8 @@ public final class ClientResources {
             case STAIRS -> state.setValue(StairBlock.FACING, Direction.EAST).setValue(StairBlock.HALF, Half.BOTTOM)
                     .setValue(StairBlock.SHAPE, StairsShape.STRAIGHT);
             case VSTAIRS -> state.setValue(LatheVerticalStairBlock.FACING, Direction.SOUTH);
+            // Half a block with an eighth on top, at the corner nearest the viewer in the inventory.
+            case CORNER -> state.setValue(LatheCornerBlock.EIGHTH, Eighth.TOP_NORTH_EAST).setValue(LatheCornerBlock.TYPE, CornerType.OUTER_UD);
         };
     }
 

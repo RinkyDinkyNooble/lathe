@@ -139,11 +139,7 @@ public interface ShapeBlock {
         if (!(adjacent.getBlock() instanceof ShapeBlock other) || other.material() != material) return false;
         int ours = mask(state) & Octants.half(side);
         int theirs = mask(adjacent);
-        int flip = switch (side.getAxis()) {
-            case X -> 1;
-            case Y -> 2;
-            case Z -> 4;
-        };
+        int flip = Octants.flip(side.getAxis());
         for (int i = 0; i < 8; i++) {
             if ((ours & (1 << i)) != 0 && (theirs & (1 << (i ^ flip))) == 0) return false;
         }

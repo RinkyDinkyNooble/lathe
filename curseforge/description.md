@@ -1,6 +1,6 @@
 # Lathe
 
-Lathe makes **slabs, vertical slabs, stairs and vertical stairs for the blocks you choose**, from any mod. List the blocks in a small rules file and each one gets real shaped blocks that <span style="color:#2dc26b"><strong>look, sound and mine like the original</strong></span>, with recipes, drops and tags. It's for modpacks whose builders and city palettes need shapes that the block's own mod never added.
+Lathe makes **slabs, vertical slabs, stairs, vertical stairs and corners for the blocks you choose**, from any mod. List the blocks in a small rules file and each one gets real shaped blocks that <span style="color:#2dc26b"><strong>look, sound and mine like the original</strong></span>, with recipes, drops and tags. It's for modpacks whose builders and city palettes need shapes that the block's own mod never added.
 
 ***
 
@@ -20,7 +20,7 @@ One line per block in `config/lathe/`, the shapes first:
 
 <pre>
 <span style="color:#3598db"># Shapes vanilla doesn't have</span>
-slab stairs vslab vstairs minecraft:calcite
+slab stairs vslab vstairs corners minecraft:calcite
 slab vslab minecraft:*_concrete
 slab vstairs minecraft:glass nocombine
 </pre>
@@ -38,6 +38,7 @@ slab vstairs minecraft:glass nocombine
 *   **Slabs go where you aim**: the middle of a floor makes a bottom slab and its edge a vertical slab against that edge; on a wall, the middle makes a vertical slab against the wall and the top or bottom edge a top or bottom slab.
 *   **One slab item** places both kinds, when a block has both.
 *   **Vertical stairs** open toward you, on the side you aim at.
+*   **Corners** fill the gap where stairs and vertical stairs meet: the piece that fits where they overlap, or, sneaking, the piece that covers both. With nothing to fit, the corner goes where you aim.
 *   **Double slabs break one half at a time**, and the outline shows which half.
 *   **An outline previews** the piece you're about to place.
 
@@ -60,7 +61,15 @@ slab vstairs minecraft:glass nocombine
   </tr>
   <tr>
     <td align="center"><strong>Slabs And Stairs</strong><br>A BetterBlockZ pillar block, original on the left</td>
-    <td align="center"><strong>Corners And Vertical Stairs</strong><br>The same block, turned every way</td>
+    <td align="center"><strong>Stair Corners And Vertical Stairs</strong><br>The same block, turned every way</td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://raw.githubusercontent.com/RinkyDinkyNooble/lathe/main/curseforge/images/corner-outer.png" rel="nofollow"><img src="https://raw.githubusercontent.com/RinkyDinkyNooble/lathe/main/curseforge/images/corner-outer.png" alt="An outer corner joining stairs and vertical stairs" width="400"></a></td>
+    <td align="center"><a href="https://raw.githubusercontent.com/RinkyDinkyNooble/lathe/main/curseforge/images/corner-inner.png" rel="nofollow"><img src="https://raw.githubusercontent.com/RinkyDinkyNooble/lathe/main/curseforge/images/corner-inner.png" alt="An inner corner joining stairs and vertical stairs" width="400"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Outer Corner</strong><br>Upside-down stairs meeting vertical stairs</td>
+    <td align="center"><strong>Inner Corner</strong><br>The same gap, placed while sneaking</td>
   </tr>
 </table>
 
@@ -70,7 +79,7 @@ slab vstairs minecraft:glass nocombine
 
 ## Lost Cities
 
-Every shape has an id that never changes, like `lathe:minecraft__calcite_stairs`, so Lost Cities palettes can use them with a state (`[facing=north,half=bottom]`). Stairs, vertical slabs and vertical stairs turn with the parts Lost Cities rotates.
+Every shape has an id that never changes, like `lathe:minecraft__calcite_stairs`, so Lost Cities palettes can use them with a state (`[facing=north,half=bottom]`). Stairs, vertical slabs, vertical stairs and corners turn with the parts Lost Cities rotates. Corners never change shape when their neighbours change, so they stay as the palette says.
 
 ***
 

@@ -10,6 +10,9 @@ import com.rinkynooble.lathe.Octants;
 import com.rinkynooble.lathe.Placement;
 import com.rinkynooble.lathe.Registration;
 import com.rinkynooble.lathe.Shape;
+import com.rinkynooble.lathe.block.CornerType;
+import com.rinkynooble.lathe.block.Eighth;
+import com.rinkynooble.lathe.block.LatheCornerBlock;
 import com.rinkynooble.lathe.block.LatheVerticalSlabBlock;
 import com.rinkynooble.lathe.block.LatheVerticalStairBlock;
 import com.rinkynooble.lathe.block.ShapeBlock;
@@ -107,6 +110,13 @@ public final class VerifyServer {
             ")", "lathe:" + MATERIAL + "_vslab[facing=east,type=single]",
             "c", "lathe:" + MATERIAL + "_stairs[facing=south,half=bottom,shape=straight]",
             "d", "lathe:" + MATERIAL + "_vstairs[facing=north]");
+    /**
+     * Corners share a character with slabs (each half the time, Lost Cities' "blocks" list): the characters a
+     * palette names corners with in practice aren't in the parts nearest spawn.
+     */
+    static final Map<String, String> PALETTE_MIXES = Map.of(
+            "_", "lathe:" + MATERIAL + "_corner[eighth=top_north_east,type=outer_ns]",
+            "=", "lathe:" + MATERIAL + "_corner[eighth=bottom_south_west,type=inner]");
 
     private static Map<ResourceLocation, byte[]> palettePack() {
         Map<ResourceLocation, byte[]> files = new HashMap<>();
@@ -118,6 +128,18 @@ public final class VerifyServer {
             if (swap != null) {
                 object.addProperty("block", swap);
                 object.remove("damaged");
+            }
+            String mix = PALETTE_MIXES.get(object.get("char").getAsString());
+            if (swap != null && mix != null) {
+                com.google.gson.JsonArray blocks = new com.google.gson.JsonArray();
+                for (String block : List.of(swap, mix)) {
+                    JsonObject weighted = new JsonObject();
+                    weighted.addProperty("random", 64); // Lost Cities fills 128 slots in order
+                    weighted.addProperty("block", block);
+                    blocks.add(weighted);
+                }
+                object.remove("block");
+                object.add("blocks", blocks);
             }
         }
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -146,7 +168,10 @@ public final class VerifyServer {
 
         checkBlocks(level, report);
         checkPlacementMaths(report);
+        checkCornerShapes(report);
+        checkCornerPlacementMaths(report);
         checkPlacementInWorld(level, report);
+        checkCornerPlacementInWorld(level, report);
         checkBreaking(level, report);
         checkLostCitiesParsing(report);
         checkLostCitiesGeneration(server, report);
@@ -174,7 +199,7 @@ public final class VerifyServer {
                 report.check(block != null, name + ": registered");
                 if (block == null) continue;
                 ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
-                report.check(id.equals(new ResourceLocation("lathe", material.baseName() + "_" + shape.word)), name + ": id is " + id);
+                report.check(id.equals(new ResourceLocation("lathe", material.baseName() + "_" + shape.suffix)), name + ": id is " + id);
                 for (BlockState state : block.getStateDefinition().getPossibleStates()) {
                     String at = name + " " + state;
                     report.check(state.getDestroySpeed(level, pos) == source.getDestroySpeed(level, pos), at + ": hardness");
@@ -197,12 +222,8 @@ public final class VerifyServer {
                 for (TagKey<Block> tag : toolTags) {
                     report.check(state.is(tag) == source.is(tag), name + ": tag " + tag.location() + " like the source");
                 }
-                switch (shape) {
-                    case SLAB -> report.check(state.is(BlockTags.SLABS), name + ": in minecraft:slabs");
-                    case STAIRS -> report.check(state.is(BlockTags.STAIRS), name + ": in minecraft:stairs");
-                    default -> {
-                    }
-                }
+                report.check(state.is(BlockTags.SLABS) == (shape == Shape.SLAB), name + ": in minecraft:slabs only when it's a slab");
+                report.check(state.is(BlockTags.STAIRS) == (shape == Shape.STAIRS), name + ": in minecraft:stairs only when it's stairs");
                 report.check(Tools.hasTag(block, LostTags.ROTATABLE_TAG) == (shape != Shape.SLAB), name + ": lostcities:rotatable");
                 checkLoot(level, material, shape, block, report);
                 checkRecipes(level, material, shape, report);
@@ -226,6 +247,8 @@ public final class VerifyServer {
                 expected.put(state.setValue(LatheVerticalSlabBlock.TYPE, VerticalSlabType.SINGLE), 1);
                 expected.put(state.setValue(LatheVerticalSlabBlock.TYPE, VerticalSlabType.DOUBLE), 2);
             }
+            // Every corner piece drops one corner.
+            case CORNER -> block.getStateDefinition().getPossibleStates().forEach(s -> expected.put(s, 1));
             default -> expected.put(state, 1);
         }
         for (Map.Entry<BlockState, Integer> entry : expected.entrySet()) {
@@ -332,6 +355,194 @@ public final class VerifyServer {
             result |= 1 << Octants.index(x, y, z);
         }
         return result;
+    }
+
+    // ---- Corners ----
+
+    private static List<Material> cornerMaterials() {
+        return Registration.MATERIALS.values().stream().filter(m -> m.has(Shape.CORNER)).toList();
+    }
+
+    /** The 32 pieces: their eighths, that each is a different piece, and rotating and mirroring every one. */
+    private static void checkCornerShapes(Report report) {
+        report.check(!cornerMaterials().isEmpty(), "the test rules make corners");
+        for (Material material : cornerMaterials()) {
+            LatheCornerBlock block = (LatheCornerBlock) material.block(Shape.CORNER);
+            String name = material.sourceId + " corner";
+            List<BlockState> states = block.getStateDefinition().getPossibleStates();
+            report.check(states.size() == 64, name + ": 32 pieces, dry and waterlogged (got " + states.size() + " states)");
+            java.util.Set<Integer> masks = new java.util.HashSet<>();
+            for (BlockState state : states) {
+                if (state.getValue(LatheCornerBlock.WATERLOGGED)) continue;
+                Eighth eighth = state.getValue(LatheCornerBlock.EIGHTH);
+                CornerType type = state.getValue(LatheCornerBlock.TYPE);
+                int mask = ShapeBlock.mask(state); // read back from the block's VoxelShape
+                String at = name + " " + eighth + " " + type;
+                masks.add(mask);
+                report.check(mask == LatheCornerBlock.mask(eighth, type), at + ": shape matches its mask");
+                if (type == CornerType.INNER) {
+                    report.check(mask == (Octants.FULL & ~eighth.bit()), at + ": a full block without that eighth");
+                } else {
+                    Direction away = eighth.side(type.axis).getOpposite();
+                    report.check(Integer.bitCount(mask) == 5 && (mask & Octants.half(away)) == Octants.half(away) && (mask & eighth.bit()) != 0,
+                            at + ": the " + away + " half plus that eighth");
+                }
+                report.check(block.byMask(mask) == state.setValue(LatheCornerBlock.WATERLOGGED, false), at + ": found again from its mask");
+                for (Rotation rotation : Rotation.values()) {
+                    report.check(ShapeBlock.mask(state.rotate(rotation)) == rotateMask(mask, rotation), at + " rotated " + rotation + " turns its eighths");
+                }
+                for (Mirror mirror : Mirror.values()) {
+                    report.check(ShapeBlock.mask(state.mirror(mirror)) == mirrorMask(mask, mirror), at + " mirrored " + mirror + " flips its eighths");
+                }
+            }
+            report.check(masks.size() == 32, name + ": 32 different pieces (got " + masks.size() + ")");
+            report.check(block.byMask(Octants.FULL) == null && block.byMask(Octants.half(Direction.UP)) == null && block.byMask(0) == null,
+                    name + ": a full block, a slab or nothing isn't a corner");
+        }
+    }
+
+    private static void checkCornerPlacementMaths(Report report) {
+        // A neighbour's face profile pushed through the block.
+        int upsideDownStairsFacingNorth = Octants.half(Direction.UP) | (Octants.half(Direction.DOWN) & Octants.half(Direction.NORTH));
+        int prism = Placement.prism(upsideDownStairsFacingNorth, Direction.WEST);
+        report.check(prism == (Octants.FULL & ~(Octants.half(Direction.DOWN) & Octants.half(Direction.SOUTH))),
+                "upside-down stairs to the west reach in as a block without its bottom south quarter (got " + Integer.toHexString(prism) + ")");
+        report.check(Placement.prism(Octants.FULL, Direction.WEST) == 0, "a full neighbour says nothing");
+        report.check(Placement.prism(0, Direction.WEST) == 0, "an empty neighbour says nothing");
+        report.check(Placement.prism(Octants.half(Direction.WEST), Direction.WEST) == 0, "a vertical slab facing away says nothing");
+        report.check(Placement.prism(Octants.half(Direction.DOWN), Direction.UP) == 0, "a bottom slab above says nothing (its face toward us is empty)");
+
+        // By aim: the bulk on the clicked face, the eighth on the far side in the quarter aimed at.
+        record Case(Direction face, Vec3 local, boolean sneaking, Eighth eighth, CornerType type) {
+        }
+        List<Case> cases = List.of(
+                new Case(Direction.UP, new Vec3(0.8, 0, 0.2), false, Eighth.TOP_NORTH_EAST, CornerType.OUTER_UD),
+                new Case(Direction.UP, new Vec3(0.8, 0, 0.2), true, Eighth.TOP_NORTH_EAST, CornerType.INNER),
+                new Case(Direction.DOWN, new Vec3(0.2, 1, 0.8), false, Eighth.BOTTOM_SOUTH_WEST, CornerType.OUTER_UD),
+                // The screenshot's wall, clicked where the pieces should go.
+                new Case(Direction.SOUTH, new Vec3(0.2, 0.8, 0), false, Eighth.TOP_SOUTH_WEST, CornerType.OUTER_NS),
+                new Case(Direction.SOUTH, new Vec3(0.8, 0.2, 0), true, Eighth.BOTTOM_SOUTH_EAST, CornerType.INNER),
+                new Case(Direction.NORTH, new Vec3(0.7, 0.7, 1), false, Eighth.TOP_NORTH_EAST, CornerType.OUTER_NS),
+                new Case(Direction.EAST, new Vec3(0, 0.7, 0.3), false, Eighth.TOP_NORTH_EAST, CornerType.OUTER_EW),
+                new Case(Direction.WEST, new Vec3(1, 0.3, 0.7), false, Eighth.BOTTOM_SOUTH_WEST, CornerType.OUTER_EW),
+                // A bottom slab's top face, clicked from above: the corner goes in the block above, the hit is below it.
+                new Case(Direction.UP, new Vec3(0.3, -0.5, 0.3), false, Eighth.TOP_NORTH_WEST, CornerType.OUTER_UD));
+        for (Case c : cases) {
+            Eighth eighth = Placement.cornerEighthByAim(c.face, c.local);
+            CornerType type = Placement.cornerTypeByAim(c.face, c.sneaking);
+            report.check(eighth == c.eighth && type == c.type, "corner by aim " + c + " gave " + eighth + " " + type);
+        }
+    }
+
+    /**
+     * The user's screenshot: upside-down stairs along a wall, vertical stairs below, and the gap where they meet.
+     * Built in all four rotations; the corner item clicked on the wall in the gap.
+     */
+    private static void checkCornerPlacementInWorld(ServerLevel level, Report report) {
+        Material material = Registration.MATERIALS.get(new ResourceLocation("betterblockz", "lablink_blockz_0"));
+        if (material == null || !material.has(Shape.CORNER)) {
+            report.check(false, "the test rules have corners for betterblockz:lablink_blockz_0");
+            return;
+        }
+        FakePlayer player = survivalPlayer(level);
+        Item item = material.items.get(Shape.CORNER);
+        LatheCornerBlock corner = (LatheCornerBlock) material.block(Shape.CORNER);
+        BlockState latheStairs = material.block(Shape.STAIRS).defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH).setValue(StairBlock.HALF, Half.TOP);
+        BlockState vanillaStairs = Blocks.STONE_BRICK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH).setValue(StairBlock.HALF, Half.TOP);
+        BlockState vstairsOpenSouthEast = material.block(Shape.VSTAIRS).defaultBlockState().setValue(LatheVerticalStairBlock.FACING, Direction.EAST);
+        BlockState vstairsOpenSouthWest = material.block(Shape.VSTAIRS).defaultBlockState().setValue(LatheVerticalStairBlock.FACING, Direction.SOUTH);
+        BlockState outer = cornerState(corner, Eighth.TOP_SOUTH_WEST, CornerType.OUTER_NS);
+        BlockState inner = cornerState(corner, Eighth.BOTTOM_SOUTH_EAST, CornerType.INNER);
+
+        record Scene(String name, BlockState stairs, BlockState vstairs, boolean sneaking, BlockState expected) {
+        }
+        List<Scene> scenes = List.of(
+                new Scene("the screenshot, not sneaking", latheStairs, vstairsOpenSouthEast, false, outer),
+                new Scene("the screenshot, sneaking", latheStairs, vstairsOpenSouthEast, true, inner),
+                new Scene("vanilla stone brick stairs, not sneaking", vanillaStairs, vstairsOpenSouthEast, false, outer),
+                new Scene("vanilla stone brick stairs, sneaking", vanillaStairs, vstairsOpenSouthEast, true, inner),
+                new Scene("the pilaster the other way round, not sneaking", latheStairs, vstairsOpenSouthWest, false,
+                        cornerState(corner, Eighth.TOP_SOUTH_EAST, CornerType.OUTER_NS)),
+                new Scene("the pilaster the other way round, sneaking", latheStairs, vstairsOpenSouthWest, true,
+                        cornerState(corner, Eighth.BOTTOM_SOUTH_WEST, CornerType.INNER)));
+        BlockPos gap = testSite(level).above(2);
+        for (Scene scene : scenes) {
+            for (Rotation rotation : Rotation.values()) {
+                clearAround(level, gap);
+                // The wall to the north (and a full block above, like the screenshot's dirt), the stairs to the
+                // west, the vertical stairs below; all turned by the rotation around the gap.
+                for (int dx = -2; dx <= 2; dx++) {
+                    for (int dy = -2; dy <= 2; dy++) {
+                        level.setBlock(gap.offset(new BlockPos(dx, dy, -1).rotate(rotation)), Blocks.STONE_BRICKS.defaultBlockState(), 3);
+                    }
+                }
+                level.setBlock(gap.offset(new BlockPos(0, 1, 0).rotate(rotation)), Blocks.DIRT.defaultBlockState(), 3);
+                level.setBlock(gap.offset(new BlockPos(-1, 0, 0).rotate(rotation)), scene.stairs.rotate(rotation), 3);
+                level.setBlock(gap.offset(new BlockPos(-2, 0, 0).rotate(rotation)), scene.stairs.rotate(rotation), 3);
+                level.setBlock(gap.offset(new BlockPos(0, -1, 0).rotate(rotation)), scene.vstairs.rotate(rotation), 3);
+                level.setBlock(gap.offset(new BlockPos(0, -2, 0).rotate(rotation)), scene.vstairs.rotate(rotation), 3);
+                // Click the wall's face in the gap, in the middle (the neighbours decide, not the aim).
+                Direction face = rotation.rotate(Direction.SOUTH);
+                BlockPos wall = gap.relative(face.getOpposite());
+                Vec3 hit = Vec3.atCenterOf(gap).add(Vec3.atLowerCornerOf(face.getOpposite().getNormal()).scale(0.5));
+                player.setShiftKeyDown(scene.sneaking);
+                use(player, new ItemStack(item, 4), wall, face, hit);
+                player.setShiftKeyDown(false);
+                BlockState placed = level.getBlockState(gap);
+                BlockState expected = scene.expected.rotate(rotation);
+                report.check(placed == expected, "corner in " + scene.name + ", turned " + rotation + ": " + expected + " (got " + placed + ")");
+                if (rotation == Rotation.NONE) report.info("corner in " + scene.name + ": " + placed);
+            }
+        }
+
+        // No neighbour with a partial face: by aim. On a floor, outer is half a block with an eighth on top.
+        BlockPos base = testSite(level);
+        reset(level, base);
+        player.setShiftKeyDown(false);
+        use(player, new ItemStack(item, 4), base, Direction.UP, new Vec3(base.getX() + 0.8, base.getY() + 1, base.getZ() + 0.2));
+        BlockState placed = level.getBlockState(base.above());
+        report.check(placed == cornerState(corner, Eighth.TOP_NORTH_EAST, CornerType.OUTER_UD),
+                "corner on an open floor, aiming north-east: outer_ud, eighth top_north_east (got " + placed + ")");
+        reset(level, base);
+        player.setShiftKeyDown(true);
+        use(player, new ItemStack(item, 4), base, Direction.UP, new Vec3(base.getX() + 0.2, base.getY() + 1, base.getZ() + 0.8));
+        player.setShiftKeyDown(false);
+        placed = level.getBlockState(base.above());
+        report.check(placed == cornerState(corner, Eighth.TOP_SOUTH_WEST, CornerType.INNER),
+                "corner on an open floor, sneaking, aiming south-west: inner, eighth top_south_west (got " + placed + ")");
+
+        // One partial neighbour (a bottom slab beside it) isn't enough to make a corner: by aim again.
+        reset(level, base);
+        level.setBlock(base.above().west(), material.block(Shape.SLAB).defaultBlockState(), 3);
+        use(player, new ItemStack(item, 4), base, Direction.UP, new Vec3(base.getX() + 0.2, base.getY() + 1, base.getZ() + 0.8));
+        placed = level.getBlockState(base.above());
+        report.check(placed == cornerState(corner, Eighth.TOP_SOUTH_WEST, CornerType.OUTER_UD),
+                "corner beside one slab goes by aim (got " + placed + ")");
+
+        // In water it's waterlogged.
+        reset(level, base);
+        level.setBlock(base.above(), Blocks.WATER.defaultBlockState(), 3);
+        use(player, new ItemStack(item, 4), base, Direction.UP, new Vec3(base.getX() + 0.8, base.getY() + 1, base.getZ() + 0.2));
+        placed = level.getBlockState(base.above());
+        report.check(placed.is(corner) && placed.getValue(LatheCornerBlock.WATERLOGGED), "corner placed in water is waterlogged (got " + placed + ")");
+
+        // Mined with a pickaxe, a corner drops one corner.
+        breakAt(level, player, base.above(), outer, new Vec3(base.getX() + 0.5, base.getY() + 3.6, base.getZ() + 0.5), 90.0F);
+        report.check(level.getBlockState(base.above()).isAir(), "mining a corner removes it");
+        report.check(dropped(level, base.above(), item) == 1, "a mined corner drops one corner (got " + dropped(level, base.above(), item) + ")");
+        clearAround(level, gap);
+        reset(level, base);
+    }
+
+    private static BlockState cornerState(LatheCornerBlock corner, Eighth eighth, CornerType type) {
+        return corner.defaultBlockState().setValue(LatheCornerBlock.EIGHTH, eighth).setValue(LatheCornerBlock.TYPE, type);
+    }
+
+    private static void clearAround(ServerLevel level, BlockPos centre) {
+        for (BlockPos pos : BlockPos.betweenClosed(centre.offset(-3, -3, -3), centre.offset(3, 3, 3))) {
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2 | 16);
+        }
+        for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class, new AABB(centre).inflate(5))) item.discard();
     }
 
     private static FakePlayer survivalPlayer(ServerLevel level) {
@@ -488,6 +699,8 @@ public final class VerifyServer {
                 {"lathe:" + MATERIAL + "_stairs[facing=north,half=bottom]", "facing=east"},
                 {"lathe:" + MATERIAL + "_vslab[facing=north,type=single]", "facing=east"},
                 {"lathe:" + MATERIAL + "_vstairs[facing=north]", "facing=east"},
+                {"lathe:" + MATERIAL + "_corner[eighth=top_north_east,type=outer_ns]", "eighth=top_south_east,type=outer_ew"},
+                {"lathe:" + MATERIAL + "_corner[eighth=bottom_south_west,type=inner]", "eighth=bottom_north_west,type=inner"},
                 {"lathe:" + MATERIAL + "_slab[type=top]", null},
         };
         for (String[] c : cases) {
@@ -565,13 +778,17 @@ public final class VerifyServer {
         long vstairs = found.entrySet().stream().filter(e -> e.getKey().contains("_vstairs}")).mapToLong(Map.Entry::getValue).sum();
         report.check(vslabs > 0, "Lost Cities placed Lathe vertical slabs (" + vslabs + ")");
         report.info("vertical stairs placed: " + vstairs + " (their palette character is in few parts)");
+        long corners = found.entrySet().stream().filter(e -> e.getKey().contains("_corner}")).mapToLong(Map.Entry::getValue).sum();
+        report.check(corners > 0, "Lost Cities placed Lathe corners from a palette string with a state (" + corners + ")");
 
         // Lost Cities turns rotatable blocks in rotated parts (fronts, scattered buildings, highways, railways)
         // with LostCityTerrainFeature.transformBlockState. Run it on Lathe's states.
         mcjty.lostcities.worldgen.IDimensionInfo dimension = ((mcjty.lostcities.worldgen.LostCityFeature)
                 mcjty.lostcities.setup.Registration.LOSTCITY_FEATURE.get()).getDimensionInfo(city);
         mcjty.lostcities.worldgen.LostCityTerrainFeature feature = dimension.getFeature();
-        for (Map.Entry<String, String> swap : PALETTE_SWAPS.entrySet()) {
+        Map<String, String> placed = new TreeMap<>(PALETTE_SWAPS);
+        PALETTE_MIXES.forEach((c, block) -> placed.put(c + " (mixed in)", block));
+        for (Map.Entry<String, String> swap : placed.entrySet()) {
             BlockState state = Tools.stringToState(swap.getValue());
             boolean rotatable = !(state.getBlock() instanceof SlabBlock);
             for (mcjty.lostcities.worldgen.lost.Transform transform : mcjty.lostcities.worldgen.lost.Transform.values()) {

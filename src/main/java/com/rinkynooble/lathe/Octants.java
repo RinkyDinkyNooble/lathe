@@ -38,6 +38,15 @@ public final class Octants {
         return mask;
     }
 
+    /** XOR an octant index with this to reach the octant on the other side of {@code axis}. */
+    public static int flip(Direction.Axis axis) {
+        return switch (axis) {
+            case X -> 1;
+            case Y -> 2;
+            case Z -> 4;
+        };
+    }
+
     public static VoxelShape shape(int mask) {
         VoxelShape cached = SHAPES[mask];
         if (cached != null) return cached;
