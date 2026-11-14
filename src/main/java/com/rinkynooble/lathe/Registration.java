@@ -1,6 +1,8 @@
 package com.rinkynooble.lathe;
 
 import com.rinkynooble.lathe.block.LatheCornerBlock;
+import com.rinkynooble.lathe.block.LatheEighthBlock;
+import com.rinkynooble.lathe.block.LatheQuarterBlock;
 import com.rinkynooble.lathe.block.LatheSlabBlock;
 import com.rinkynooble.lathe.block.LatheStairBlock;
 import com.rinkynooble.lathe.block.LatheVerticalSlabBlock;
@@ -112,6 +114,8 @@ public final class Registration {
                     case STAIRS -> new LatheStairBlock(material);
                     case VSTAIRS -> new LatheVerticalStairBlock(material);
                     case CORNER -> new LatheCornerBlock(material);
+                    case QUARTER -> new LatheQuarterBlock(material);
+                    case EIGHTH -> new LatheEighthBlock(material);
                 };
                 material.blocks.put(shape, block);
                 event.register(Registries.BLOCK, material.id(shape), () -> block);

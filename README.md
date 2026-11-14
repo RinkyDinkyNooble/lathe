@@ -1,6 +1,6 @@
 # Lathe
 
-Lathe is a Forge mod for modpack makers. It makes slabs, vertical slabs, stairs, vertical stairs and corners for the blocks you list, and only those. Each shape is a real block with its own stable id, looks like its source block, mines and sounds like it, and can be used in Lost Cities palettes.
+Lathe is a Forge mod for modpack makers. It makes slabs, vertical slabs, stairs, vertical stairs, corners, quarters and eighths for the blocks you list, and only those. Each shape is a real block with its own stable id, looks like its source block, mines and sounds like it, and can be used in Lost Cities palettes.
 
 It was made for the ABZA modpack, whose city palettes use BetterBlockZ (1,498 full blocks, no slabs or stairs), but it works with any mod's full blocks.
 
@@ -34,7 +34,7 @@ One block per line, the shapes first. `#` starts a comment.
 
 ```
 # Shapes vanilla doesn't have
-slab stairs vslab vstairs corners minecraft:calcite
+slab stairs vslab vstairs corners quarters eighths minecraft:calcite
 slab vslab minecraft:*_concrete
 slab vstairs minecraft:glass nocombine
 ```
@@ -46,6 +46,8 @@ slab vstairs minecraft:glass nocombine
 | `stairs` | Stairs, as vanilla's (corners and all) |
 | `vstairs` | Vertical stairs: a full-height block with one vertical quarter missing, an L seen from above |
 | `corners` | Corner pieces for joining stairs and vertical stairs: a block minus one eighth (inner), or half a block plus one eighth on the other side (outer). One block holds all 32 pieces as states. |
+| `quarters` | A quarter of a block running the length of one edge: half a vertical slab. Upright poles (where two vertical slabs overlap in an L) and beams lying along x or z (where a floor or ceiling slab meets a wall slab). One block holds all 12 as states. |
+| `eighths` | One eighth of a block (where three slabs overlap). One block holds all 8 as states. |
 
 | Option | What it does |
 |---|---|
@@ -68,9 +70,11 @@ lathe:minecraft__calcite_vslab
 lathe:minecraft__calcite_stairs
 lathe:minecraft__calcite_vstairs
 lathe:minecraft__calcite_corner
+lathe:minecraft__calcite_quarter
+lathe:minecraft__calcite_eighth
 ```
 
-The rule word `corners` is plural; the id ends in `_corner`.
+The rule words `corners`, `quarters` and `eighths` are plural; the ids end in `_corner`, `_quarter` and `_eighth`.
 
 They're built from the source's id alone, so they never change between Lathe versions and Lost Cities palettes and worlds can rely on them.
 
@@ -81,6 +85,10 @@ They're built from the source's id alone, so they never change between Lathe ver
 | Stairs | Vanilla's: `facing`, `half=bottom\|top`, `shape=straight\|inner_left\|inner_right\|outer_left\|outer_right`, `waterlogged` |
 | Vertical stairs | `facing`, `waterlogged`. The open quarter is the corner between `facing` and the side clockwise from it: `north` leaves the north-east quarter open, `east` the south-east, `south` the south-west, `west` the north-west. |
 | Corner | `eighth`, `type`, `waterlogged` (see [Corner states](#corner-states)) |
+| Quarter | `edge`, `waterlogged` (see [Quarter and eighth states](#quarter-and-eighth-states)) |
+| Eighth | `eighth`, `waterlogged` |
+
+When a slab item places both kinds of slab (a rule with both `slab` and `vslab`), vertical slabs have no item of their own: they drop the slab item and pick-block gives it. When a rule has `vslab` without `slab`, the vertical slab gets its own item, `lathe:<...>_vslab`.
 
 ### Corner states
 
@@ -94,7 +102,18 @@ They're built from the source's id alone, so they never change between Lathe ver
 | `outer_ns` | The north or south half away from that eighth, plus the eighth | 8 |
 
 All 32 combinations are valid and all are different pieces. `lathe:minecraft__calcite_corner[eighth=top_south_west,type=outer_ns]` is the north half with an eighth at the top south-west. Unlike stairs, a corner never changes shape when its neighbours change.
-When a slab item places both kinds of slab (a rule with both `slab` and `vslab`), vertical slabs have no item of their own: they drop the slab item and pick-block gives it. When a rule has `vslab` without `slab`, the vertical slab gets its own item, `lathe:<...>_vslab`.
+
+### Quarter and eighth states
+
+A quarter's `edge` names the edge of the block it runs along by its two sides, in the order up-down, north-south, east-west (as `eighth` names are):
+
+| Quarter | `edge` values |
+|---|---|
+| Upright poles | `north_west`, `north_east`, `south_west`, `south_east` |
+| Beams along x (east-west) | `bottom_north`, `bottom_south`, `top_north`, `top_south` |
+| Beams along z (north-south) | `bottom_west`, `bottom_east`, `top_west`, `top_east` |
+
+`lathe:minecraft__calcite_quarter[edge=bottom_north]` is a beam lying along the bottom north edge: where a floor slab meets a wall slab on the north. An eighth's `eighth` takes the same 8 values as a corner's. Quarters and eighths never change shape when their neighbours change.
 
 ## Lost Cities
 
@@ -105,12 +124,14 @@ Use the ids with a state in a palette, as for any block:
 {"char": "v", "block": "lathe:minecraft__calcite_vslab[facing=east,type=single]"},
 {"char": "L", "block": "lathe:minecraft__calcite_vstairs[facing=south]"},
 {"char": "k", "block": "lathe:minecraft__calcite_corner[eighth=top_south_west,type=outer_ns]"},
+{"char": "q", "block": "lathe:minecraft__calcite_quarter[edge=north_east]"},
+{"char": "e", "block": "lathe:minecraft__calcite_eighth[eighth=bottom_south_west]"},
 {"char": "_", "block": "lathe:minecraft__white_concrete_slab[type=top]"}
 ```
 
-Stairs, vertical slabs, vertical stairs and corners are in `lostcities:rotatable` (stairs through `minecraft:stairs`), so Lost Cities turns them in the parts it rotates: building fronts, scattered buildings, highways, bridges and railways. Lost Cities doesn't rotate ordinary building parts; their palettes name each facing.
+Stairs, vertical slabs, vertical stairs, corners, quarters and eighths are in `lostcities:rotatable` (stairs through `minecraft:stairs`), so Lost Cities turns them in the parts it rotates: building fronts, scattered buildings, highways, bridges and railways. Lost Cities doesn't rotate ordinary building parts; their palettes name each facing.
 
-Stairs (vanilla's, and Lathe's, which are vanilla's) reshape from their neighbours, so a palette's `shape=inner_left` turns back into straight stairs at the first block update unless the neighbours are stairs that agree. Corners have fixed states: the piece a palette names is the piece that stays.
+Stairs (vanilla's, and Lathe's, which are vanilla's) reshape from their neighbours, so a palette's `shape=inner_left` turns back into straight stairs at the first block update unless the neighbours are stairs that agree. Corners, quarters and eighths have fixed states: the piece a palette names is the piece that stays.
 
 ## Placing, breaking and combining
 
@@ -121,13 +142,30 @@ Stairs (vanilla's, and Lathe's, which are vanilla's) reshape from their neighbou
 
 When a rule has only `slab`, slabs place as vanilla (top or bottom by the half of the face). With only `vslab`, the strips and the centre all pick a side for the vertical slab.
 
-**Placing stairs** works as vanilla. **Vertical stairs** face the open quarter toward you, on the side of the block you aim at: looking north and aiming at the right half of a face leaves the south-east quarter open.
+**Placing stairs** works as vanilla.
 
-**Placing corners** fills the gap between the blocks around it. For each of the six neighbours, Lathe takes the eighths of its shape that touch the shared face (any block's shape, not only Lathe's). A face that's neither empty nor whole is extended through the new block as a prism. Then:
+**Fitting the neighbours.** Vertical stairs, corners, quarters and eighths look at the blocks around the spot first. For each of the six neighbours, Lathe takes the eighths of its shape that touch the shared face (any block's shape, not only Lathe's). A face that's neither empty nor whole is extended through the new block as a prism. Where the prisms *overlap*, or everything they cover *together*, is the piece the neighbours call for. Each kind uses it as below; when the result isn't one of its pieces (one neighbour, no neighbours, or neighbours calling for some other piece), it goes by aim.
 
-- **Not sneaking:** the piece is where the prisms overlap. Upside-down stairs along a wall with vertical stairs below make the outer piece that continues both: the half against the wall plus one eighth.
-- **Sneaking:** the piece is everything the prisms cover together: the inner piece, a full block minus the eighth both neighbours leave open.
-- **When that isn't one of the 32 pieces** (one neighbour, no neighbours, or neighbours that don't make a corner), the corner goes by aim. Its bulk sits on the face you click, as stairs do, and the eighth goes in the quarter of the face you aim at. On a floor, the outer piece is a bottom half with an eighth on top, and the inner piece (sneaking) a full block with a notch at the top.
+**Vertical stairs:**
+
+- **Not sneaking:** the overlap if that's vertical stairs (one placed on another continues its column), else everything covered together if that's vertical stairs (two vertical slabs meeting in an L make the vertical stairs that fill the corner).
+- **Sneaking, or nothing to fit:** the open quarter faces you, on the side of the block you aim at: looking north and aiming at the right half of a face leaves the south-east quarter open.
+
+**Corners:**
+
+- **Not sneaking:** the overlap. Upside-down stairs along a wall with vertical stairs below make the outer piece that continues both: the half against the wall plus one eighth.
+- **Sneaking:** everything covered together: the inner piece, a full block minus the eighth both neighbours leave open.
+- **Nothing to fit:** its bulk sits on the face you click, as stairs do, and the eighth goes in the quarter of the face you aim at. On a floor, the outer piece is a bottom half with an eighth on top, and the inner piece (sneaking) a full block with a notch at the top.
+
+**Quarters:**
+
+- **Not sneaking:** the overlap. Two vertical slabs meeting in an L make the upright pole where they overlap; a quarter placed against the end of a beam or on top of a pole continues it. Which piece closes an L corner depends on the walls: when their halves are on the inside of the corner, the pole closes it; when they're on the outside, the pole leaves a slot on each side and vertical stairs are the piece that closes it.
+- **Sneaking, or nothing to fit:** by aim. Aiming near a corner of the face you click (more than a quarter block from its centre both ways) places the quarter standing out of the face at that corner: on a floor, an upright pole in that corner. Anywhere else places the quarter lying on the face along the nearest edge: on a floor, a beam along that edge. On a wall the corners give beams sticking out of the wall and the edges give beams or poles against it, so all 12 can be placed.
+
+**Eighths:**
+
+- **Not sneaking:** the overlap, when three slabs meet around the spot.
+- **Sneaking, or nothing to fit:** against the face you click, in the quarter of the face you aim at.
 
 While you hold a Lathe item, the outline of the piece it would place is drawn as well as the block you aim at.
 
@@ -159,10 +197,10 @@ Names come from the source's name in the game's language: "Calcite Slab", "Calci
 
 Generated into a data pack held in memory, always on:
 
-- **Stonecutter**, from the source: 2 slabs, 1 stairs, 2 vertical slabs (when they have their own item), 1 vertical stairs, 1 corner.
+- **Stonecutter**, from the source: 2 slabs, 1 stairs, 2 vertical slabs (when they have their own item), 1 vertical stairs, 1 corner, 4 quarters, 8 eighths. Quarters and eighths have no recipe back.
 - **Crafting**: two slabs back into the source block (stacked; side by side for vertical slabs with their own item).
-- **Loot**: each shape drops itself (every corner piece drops one corner); a double slab drops two; explosions may destroy some, as with vanilla slabs.
-- **Tags**: `minecraft:slabs` and `minecraft:stairs` (blocks and items); `lostcities:rotatable` for vertical slabs, vertical stairs and corners (corners aren't in `minecraft:stairs`); the source's tool tags (`minecraft:mineable/*`, `minecraft:needs_*_tool`, `forge:needs_*_tool`), read from the tag files in every mod's jar, nested tags included.
+- **Loot**: each shape drops itself (every corner, quarter and eighth drops one of itself); a double slab drops two; explosions may destroy some, as with vanilla slabs.
+- **Tags**: `minecraft:slabs` and `minecraft:stairs` (blocks and items); `lostcities:rotatable` for vertical slabs, vertical stairs, corners, quarters and eighths (none of these are in `minecraft:slabs` or `minecraft:stairs`); the source's tool tags (`minecraft:mineable/*`, `minecraft:needs_*_tool`, `forge:needs_*_tool`), read from the tag files in every mod's jar, nested tags included.
 
 Sources without an item get no recipes.
 
@@ -175,12 +213,12 @@ Lathe also opens a network channel, `lathe:rules`, whose version is a hash of th
 ## Startup log
 
 ```
-Lathe: rules hash 2d70889a732c. The client and the server need the same config/lathe/ rules.
+Lathe: rules hash 325bd42dfb86. The client and the server need the same config/lathe/ rules.
 Lathe: vanilla.rules:2: minecraft:*_concrete made shapes for 16 blocks (32 shapes)
 Lathe: vanilla.rules:4: skipped betterblockz:lablink_blockz_0: Scalpel redacted it
 Lathe: example.rules: 0 blocks, 0 shapes
-Lathe: vanilla.rules: 18 blocks, 38 shapes
-Lathe: 38 shapes for 18 blocks
+Lathe: vanilla.rules: 18 blocks, 41 shapes
+Lathe: 41 shapes for 18 blocks
 ```
 
 ## Scalpel
@@ -213,8 +251,8 @@ The dev runs load BetterBlockZ, The Lost Cities, and (with `-PwithRenderers`) Em
 
 Dev-only checks live in `src/verify` and are never shipped:
 
-- `gradlew runVerifyServer` starts a headless server in `run-server/` with the rules in `run-server/config/lathe/`, runs the checks, writes `run-server/lathe-verify.txt` and stops. It checks every shape of every rule against its source (hardness, light, sound, map colour, tool needs, see-through-ness, mining speed and harvesting with several tools, tool tags), that no shape ticks or has a block entity, loot for every state, stonecutter and crafting recipes, slab, stairs and Lost Cities tags, the placement maths, placing and half-breaking with a player in the world (drops counted), and that nothing about Lathe was logged as an error. For corners it checks all 32 pieces' shapes, that rotating and mirroring each one turns its eighths the same way, the placing maths, and placing in the world: upside-down stairs along a wall with vertical stairs below, with and without sneaking, in all four rotations, with Lathe's and vanilla stairs, then by aim on an open floor and beside a single slab. Then it swaps some of Lost Cities' default palette entries for Lathe shapes with states (corners mixed in half the time), generates 160 Lost Cities building chunks, counts the shapes placed, and runs Lost Cities' own rotation code on them.
-- `gradlew runVerifyClient` (add `-PwithRenderers` for Embeddium and Oculus) joins `run/saves/lathe-test` (a copy of the verify server's world), checks that every state of every shape has a model whose faces use the source's textures, shading, tint, ambient occlusion and render layer, checks item models and names, builds a gallery of every shape next to its source and of all 32 corner pieces, takes screenshots into `run/screenshots/`, and places and half-breaks through the real client, including an outer corner and (sneaking) an inner corner where stairs meet vertical stairs. It writes `run/lathe-verify-client.txt` and quits.
+- `gradlew runVerifyServer` starts a headless server in `run-server/` with the rules in `run-server/config/lathe/`, runs the checks, writes `run-server/lathe-verify.txt` and stops. It checks every shape of every rule against its source (hardness, light, sound, map colour, tool needs, see-through-ness, mining speed and harvesting with several tools, tool tags), that no shape ticks or has a block entity, loot for every state, stonecutter and crafting recipes, slab, stairs and Lost Cities tags, the placement maths, placing and half-breaking with a player in the world (drops counted), and that nothing about Lathe was logged as an error. For corners it checks all 32 pieces' shapes, that rotating and mirroring each one turns its eighths the same way, the placing maths, and placing in the world: upside-down stairs along a wall with vertical stairs below, with and without sneaking, in all four rotations, with Lathe's and vanilla stairs, then by aim on an open floor and beside a single slab. For quarters and eighths it checks all 12 and 8 pieces the same way, the aim maths on floors, ceilings and walls (and that every piece can be reached), and fitting in the world in all four rotations: both kinds of L of vertical slabs (a pole, or vertical stairs with the vertical stairs item), a beam continued end-on, a pole and vertical stairs stacked, three slabs meeting (an eighth), sneaking going by aim, neighbours calling for some other piece, water and drops. Then it swaps some of Lost Cities' default palette entries for Lathe shapes with states (corners, quarters and eighths mixed in), generates 160 Lost Cities building chunks, counts the shapes placed, and runs Lost Cities' own rotation code on them.
+- `gradlew runVerifyClient` (add `-PwithRenderers` for Embeddium and Oculus) joins `run/saves/lathe-test` (a copy of the verify server's world), checks that every state of every shape has a model whose faces use the source's textures, shading, tint, ambient occlusion and render layer, checks item models and names, builds a gallery of every shape next to its source, of all 32 corner pieces, and of all 12 quarters and 8 eighths, takes screenshots into `run/screenshots/`, and places and half-breaks through the real client: an outer corner and (sneaking) an inner corner where stairs meet vertical stairs, two poles closing an L of vertical slabs (next to the same L left empty), a beam along a floor-wall edge continued end-on, and an eighth where three slabs meet. It writes `run/lathe-verify-client.txt` and quits.
 
 ## Inspiration
 

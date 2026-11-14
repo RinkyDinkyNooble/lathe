@@ -60,7 +60,7 @@ public final class DataGen {
                 switch (shape) {
                     case SLAB -> blockTags.computeIfAbsent(new ResourceLocation("slabs"), k -> new ArrayList<>()).add(id.toString());
                     case STAIRS -> blockTags.computeIfAbsent(new ResourceLocation("stairs"), k -> new ArrayList<>()).add(id.toString());
-                    case VSLAB, VSTAIRS, CORNER -> blockTags.computeIfAbsent(new ResourceLocation("lostcities", "rotatable"), k -> new ArrayList<>()).add(id.toString());
+                    case VSLAB, VSTAIRS, CORNER, QUARTER, EIGHTH -> blockTags.computeIfAbsent(new ResourceLocation("lostcities", "rotatable"), k -> new ArrayList<>()).add(id.toString());
                 }
                 for (String tag : sourceToolTags.getOrDefault(material.sourceId, Set.of())) {
                     blockTags.computeIfAbsent(new ResourceLocation(tag), k -> new ArrayList<>()).add(id.toString());
@@ -70,9 +70,8 @@ public final class DataGen {
                 if (shape == Shape.SLAB) itemTags.computeIfAbsent(new ResourceLocation("slabs"), k -> new ArrayList<>()).add(id.toString());
                 if (shape == Shape.STAIRS) itemTags.computeIfAbsent(new ResourceLocation("stairs"), k -> new ArrayList<>()).add(id.toString());
                 if (sourceItem == Items.AIR) continue;
-                int count = shape == Shape.SLAB || shape == Shape.VSLAB ? 2 : 1;
                 put(files, new ResourceLocation(Lathe.MOD_ID, "recipes/" + id.getPath() + "_from_stonecutting.json"),
-                        stonecutting(material.sourceId, id, count));
+                        stonecutting(material.sourceId, id, stonecutterCount(shape)));
                 if (shape == Shape.SLAB || shape == Shape.VSLAB) {
                     put(files, new ResourceLocation(Lathe.MOD_ID, "recipes/" + material.baseName() + "_from_" + shape.word + ".json"),
                             backToSource(id, material.sourceId, shape == Shape.SLAB));
@@ -82,6 +81,16 @@ public final class DataGen {
         blockTags.forEach((tag, values) -> put(files, new ResourceLocation(tag.getNamespace(), "tags/blocks/" + tag.getPath() + ".json"), tag(values)));
         itemTags.forEach((tag, values) -> put(files, new ResourceLocation(tag.getNamespace(), "tags/items/" + tag.getPath() + ".json"), tag(values)));
         return files;
+    }
+
+    /** How many of a shape the stonecutter makes from one source block: as many as fit in it, for the halves and smaller. */
+    public static int stonecutterCount(Shape shape) {
+        return switch (shape) {
+            case SLAB, VSLAB -> 2;
+            case QUARTER -> 4;
+            case EIGHTH -> 8;
+            case STAIRS, VSTAIRS, CORNER -> 1;
+        };
     }
 
     private static void put(Map<ResourceLocation, byte[]> files, ResourceLocation location, JsonElement json) {

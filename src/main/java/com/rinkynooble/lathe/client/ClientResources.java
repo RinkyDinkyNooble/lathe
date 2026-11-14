@@ -13,8 +13,11 @@ import com.rinkynooble.lathe.Shape;
 import com.rinkynooble.lathe.block.CornerType;
 import com.rinkynooble.lathe.block.Eighth;
 import com.rinkynooble.lathe.block.LatheCornerBlock;
+import com.rinkynooble.lathe.block.LatheEighthBlock;
+import com.rinkynooble.lathe.block.LatheQuarterBlock;
 import com.rinkynooble.lathe.block.LatheVerticalSlabBlock;
 import com.rinkynooble.lathe.block.LatheVerticalStairBlock;
+import com.rinkynooble.lathe.block.QuarterEdge;
 import com.rinkynooble.lathe.pack.ModResources;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -112,6 +115,9 @@ public final class ClientResources {
             case VSTAIRS -> state.setValue(LatheVerticalStairBlock.FACING, Direction.SOUTH);
             // Half a block with an eighth on top, at the corner nearest the viewer in the inventory.
             case CORNER -> state.setValue(LatheCornerBlock.EIGHTH, Eighth.TOP_NORTH_EAST).setValue(LatheCornerBlock.TYPE, CornerType.OUTER_UD);
+            // An upright pole and an eighth at that same corner.
+            case QUARTER -> state.setValue(LatheQuarterBlock.EDGE, QuarterEdge.NORTH_EAST);
+            case EIGHTH -> state.setValue(LatheEighthBlock.EIGHTH, Eighth.BOTTOM_NORTH_EAST);
         };
     }
 

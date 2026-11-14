@@ -181,6 +181,9 @@ public final class Rules {
             #   vstairs  vertical stairs: a full-height block with one vertical quarter missing
             #   corners  corner pieces that join stairs and vertical stairs: a block minus one eighth,
             #            or half a block plus one eighth (32 pieces in one block, chosen as you place)
+            #   quarters a quarter of a block along one edge: an upright pole at a corner, or a beam lying
+            #            along an edge (12 pieces in one block, chosen as you place)
+            #   eighths  an eighth of a block (8 pieces in one block, chosen as you place)
             #
             # Options after the block:
             #   nocombine            two slabs of this block never make a double slab by hand
@@ -191,7 +194,7 @@ public final class Rules {
             # The shapes are new blocks, so the client and the server need the same rules.
             # Removing a rule removes its blocks from every world that has them.
             #
-            # slab stairs vslab vstairs corners minecraft:calcite
+            # slab stairs vslab vstairs corners quarters eighths minecraft:calcite
             # slab vslab minecraft:*_concrete
             # slab vstairs minecraft:glass nocombine
             """;

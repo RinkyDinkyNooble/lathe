@@ -3,6 +3,7 @@ package com.rinkynooble.lathe;
 import com.rinkynooble.lathe.block.CornerType;
 import com.rinkynooble.lathe.block.Eighth;
 import com.rinkynooble.lathe.block.LatheVerticalSlabBlock;
+import com.rinkynooble.lathe.block.QuarterEdge;
 import com.rinkynooble.lathe.block.ShapeBlock;
 import com.rinkynooble.lathe.item.LatheSlabItem;
 import net.minecraft.core.BlockPos;
@@ -141,12 +142,12 @@ public final class Placement {
         return existing != null && piece(context, material) == existing.getOpposite();
     }
 
-    // ---- Corners ----
+    // ---- Fitting the neighbours: corners, quarters, eighths, vertical stairs ----
 
     /**
      * A neighbour's face profile pushed through this block: the eighths of this block lined up with the eighths of
      * the neighbour on {@code side} that touch the shared face. 0 when that profile is empty or the whole face, which
-     * says nothing about a corner.
+     * says nothing about the piece to place.
      */
     public static int prism(int neighbourMask, Direction side) {
         int touching = neighbourMask & Octants.half(side.getOpposite());
@@ -163,8 +164,9 @@ public final class Placement {
     /**
      * The piece the neighbours of {@code pos} call for: where their partial faces' prisms overlap, or (with
      * {@code union}) everything any of them covers. -1 when no neighbour has a partial face toward {@code pos}.
+     * Each kind of block decides whether the result is one of its pieces.
      */
-    public static int cornerFromNeighbours(BlockGetter level, BlockPos pos, boolean union) {
+    public static int fitFromNeighbours(BlockGetter level, BlockPos pos, boolean union) {
         int result = union ? 0 : Octants.FULL;
         boolean any = false;
         for (Direction side : Direction.values()) {
@@ -204,5 +206,49 @@ public final class Placement {
     /** The corner's kind when the neighbours don't decide: inner when sneaking, else the half on the clicked face. */
     public static CornerType cornerTypeByAim(Direction face, boolean sneaking) {
         return sneaking ? CornerType.INNER : CornerType.outer(face.getAxis());
+    }
+
+    /**
+     * The quarter when the neighbours don't decide. Aiming near a corner of the clicked face (both offsets from its
+     * centre more than a quarter block) gives the quarter standing out from the face at that corner: an upright pole
+     * on a floor. Anywhere else gives the quarter lying on the face along the nearest edge: a beam on a floor.
+     *
+     * @param face  the face clicked
+     * @param local the hit, relative to the block the quarter goes into
+     */
+    public static QuarterEdge quarterByAim(Direction face, Vec3 local) {
+        Direction.Axis[] plane = plane(face.getAxis());
+        double da = local.get(plane[0]) - 0.5, db = local.get(plane[1]) - 0.5;
+        if (Math.abs(da) > 0.25 && Math.abs(db) > 0.25) return QuarterEdge.of(side(plane[0], da), side(plane[1], db));
+        return QuarterEdge.of(face.getOpposite(), nearestEdge(face, local));
+    }
+
+    /**
+     * The eighth when the neighbours don't decide: against the clicked face, in the quarter of the face aimed at.
+     *
+     * @param face  the face clicked
+     * @param local the hit, relative to the block the eighth goes into
+     */
+    public static Eighth eighthByAim(Direction face, Vec3 local) {
+        int[] xyz = new int[3];
+        for (Direction.Axis axis : Direction.Axis.values()) {
+            xyz[axis.ordinal()] = axis == face.getAxis()
+                    ? (face.getAxisDirection() == Direction.AxisDirection.POSITIVE ? 0 : 1)
+                    : (local.get(axis) < 0.5 ? 0 : 1);
+        }
+        return Eighth.of(xyz[0], xyz[1], xyz[2]);
+    }
+
+    /** The two axes lying in a face across {@code axis}. */
+    private static Direction.Axis[] plane(Direction.Axis axis) {
+        return switch (axis) {
+            case X -> new Direction.Axis[]{Direction.Axis.Y, Direction.Axis.Z};
+            case Y -> new Direction.Axis[]{Direction.Axis.X, Direction.Axis.Z};
+            case Z -> new Direction.Axis[]{Direction.Axis.X, Direction.Axis.Y};
+        };
+    }
+
+    private static Direction side(Direction.Axis axis, double offset) {
+        return Direction.get(offset > 0 ? Direction.AxisDirection.POSITIVE : Direction.AxisDirection.NEGATIVE, axis);
     }
 }

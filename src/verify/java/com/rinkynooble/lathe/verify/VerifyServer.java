@@ -111,12 +111,15 @@ public final class VerifyServer {
             "c", "lathe:" + MATERIAL + "_stairs[facing=south,half=bottom,shape=straight]",
             "d", "lathe:" + MATERIAL + "_vstairs[facing=north]");
     /**
-     * Corners share a character with slabs (each half the time, Lost Cities' "blocks" list): the characters a
-     * palette names corners with in practice aren't in the parts nearest spawn.
+     * Corners, quarters and eighths share a character with slabs (Lost Cities' "blocks" list: the slab half the
+     * time, the others a quarter of the time each): the characters a palette names them with in practice aren't in
+     * the parts nearest spawn.
      */
-    static final Map<String, String> PALETTE_MIXES = Map.of(
-            "_", "lathe:" + MATERIAL + "_corner[eighth=top_north_east,type=outer_ns]",
-            "=", "lathe:" + MATERIAL + "_corner[eighth=bottom_south_west,type=inner]");
+    static final Map<String, List<String>> PALETTE_MIXES = Map.of(
+            "_", List.of("lathe:" + MATERIAL + "_corner[eighth=top_north_east,type=outer_ns]",
+                    "lathe:" + MATERIAL + "_quarter[edge=bottom_north]"),
+            "=", List.of("lathe:" + MATERIAL + "_corner[eighth=bottom_south_west,type=inner]",
+                    "lathe:" + MATERIAL + "_eighth[eighth=bottom_south_east]"));
 
     private static Map<ResourceLocation, byte[]> palettePack() {
         Map<ResourceLocation, byte[]> files = new HashMap<>();
@@ -129,12 +132,16 @@ public final class VerifyServer {
                 object.addProperty("block", swap);
                 object.remove("damaged");
             }
-            String mix = PALETTE_MIXES.get(object.get("char").getAsString());
+            List<String> mix = PALETTE_MIXES.get(object.get("char").getAsString());
             if (swap != null && mix != null) {
                 com.google.gson.JsonArray blocks = new com.google.gson.JsonArray();
-                for (String block : List.of(swap, mix)) {
+                List<String> all = new java.util.ArrayList<>();
+                all.add(swap);
+                all.addAll(mix);
+                for (String block : all) {
                     JsonObject weighted = new JsonObject();
-                    weighted.addProperty("random", 64); // Lost Cities fills 128 slots in order
+                    // Lost Cities fills 128 slots in order: half for the slab, the rest shared.
+                    weighted.addProperty("random", block.equals(swap) ? 64 : 64 / mix.size());
                     weighted.addProperty("block", block);
                     blocks.add(weighted);
                 }
@@ -172,6 +179,7 @@ public final class VerifyServer {
         checkCornerPlacementMaths(report);
         checkPlacementInWorld(level, report);
         checkCornerPlacementInWorld(level, report);
+        VerifyPieces.run(level, report);
         checkBreaking(level, report);
         checkLostCitiesParsing(report);
         checkLostCitiesGeneration(server, report);
@@ -247,8 +255,8 @@ public final class VerifyServer {
                 expected.put(state.setValue(LatheVerticalSlabBlock.TYPE, VerticalSlabType.SINGLE), 1);
                 expected.put(state.setValue(LatheVerticalSlabBlock.TYPE, VerticalSlabType.DOUBLE), 2);
             }
-            // Every corner piece drops one corner.
-            case CORNER -> block.getStateDefinition().getPossibleStates().forEach(s -> expected.put(s, 1));
+            // Every corner, quarter and eighth drops one of itself.
+            case CORNER, QUARTER, EIGHTH -> block.getStateDefinition().getPossibleStates().forEach(s -> expected.put(s, 1));
             default -> expected.put(state, 1);
         }
         for (Map.Entry<BlockState, Integer> entry : expected.entrySet()) {
@@ -269,7 +277,12 @@ public final class VerifyServer {
         report.check(cut.isPresent(), name + ": stonecutter recipe loaded");
         cut.ifPresent(recipe -> {
             ItemStack result = recipe.getResultItem(level.registryAccess());
-            int count = shape == Shape.SLAB || shape == Shape.VSLAB ? 2 : 1;
+            int count = switch (shape) {
+                case SLAB, VSLAB -> 2;
+                case QUARTER -> 4;
+                case EIGHTH -> 8;
+                default -> 1;
+            };
             report.check(result.is(material.items.get(shape)) && result.getCount() == count, name + ": stonecutter makes " + count + " (got " + result + ")");
             report.check(recipe.getIngredients().get(0).test(new ItemStack(material.source)), name + ": stonecutter takes the source");
         });
@@ -325,7 +338,7 @@ public final class VerifyServer {
         }
     }
 
-    private static int rotateMask(int mask, Rotation rotation) {
+    static int rotateMask(int mask, Rotation rotation) {
         int result = 0;
         for (int i = 0; i < 8; i++) {
             if ((mask & (1 << i)) == 0) continue;
@@ -342,7 +355,7 @@ public final class VerifyServer {
         return result;
     }
 
-    private static int mirrorMask(int mask, Mirror mirror) {
+    static int mirrorMask(int mask, Mirror mirror) {
         int result = 0;
         for (int i = 0; i < 8; i++) {
             if ((mask & (1 << i)) == 0) continue;
@@ -538,21 +551,21 @@ public final class VerifyServer {
         return corner.defaultBlockState().setValue(LatheCornerBlock.EIGHTH, eighth).setValue(LatheCornerBlock.TYPE, type);
     }
 
-    private static void clearAround(ServerLevel level, BlockPos centre) {
+    static void clearAround(ServerLevel level, BlockPos centre) {
         for (BlockPos pos : BlockPos.betweenClosed(centre.offset(-3, -3, -3), centre.offset(3, 3, 3))) {
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2 | 16);
         }
         for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class, new AABB(centre).inflate(5))) item.discard();
     }
 
-    private static FakePlayer survivalPlayer(ServerLevel level) {
+    static FakePlayer survivalPlayer(ServerLevel level) {
         FakePlayer player = FakePlayerFactory.getMinecraft(level);
         player.setGameMode(GameType.SURVIVAL);
         return player;
     }
 
     /** Uses an item on a face of a block, like a right click at {@code hit}. */
-    private static void use(FakePlayer player, ItemStack stack, BlockPos clicked, Direction face, Vec3 hit) {
+    static void use(FakePlayer player, ItemStack stack, BlockPos clicked, Direction face, Vec3 hit) {
         player.setItemInHand(InteractionHand.MAIN_HAND, stack);
         BlockHitResult result = new BlockHitResult(hit, face, clicked, false);
         stack.useOn(new UseOnContext(player, InteractionHand.MAIN_HAND, result));
@@ -624,12 +637,12 @@ public final class VerifyServer {
     }
 
     /** Near spawn, where chunks stay loaded with their entities, so drops can be counted. */
-    private static BlockPos testSite(ServerLevel level) {
+    static BlockPos testSite(ServerLevel level) {
         BlockPos spawn = level.getSharedSpawnPos();
         return new BlockPos(spawn.getX() + 4, 100, spawn.getZ() + 4);
     }
 
-    private static void reset(ServerLevel level, BlockPos base) {
+    static void reset(ServerLevel level, BlockPos base) {
         for (BlockPos pos : BlockPos.betweenClosed(base.offset(-2, -1, -2), base.offset(2, 3, 2))) {
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
         }
@@ -674,11 +687,11 @@ public final class VerifyServer {
         reset(level, pos.below());
     }
 
-    private static void breakAt(ServerLevel level, FakePlayer player, BlockPos pos, BlockState state, Vec3 feet, float pitch) {
+    static void breakAt(ServerLevel level, FakePlayer player, BlockPos pos, BlockState state, Vec3 feet, float pitch) {
         breakAt(level, player, pos, state, feet, 0.0F, pitch);
     }
 
-    private static void breakAt(ServerLevel level, FakePlayer player, BlockPos pos, BlockState state, Vec3 feet, float yaw, float pitch) {
+    static void breakAt(ServerLevel level, FakePlayer player, BlockPos pos, BlockState state, Vec3 feet, float yaw, float pitch) {
         reset(level, pos.below());
         level.setBlock(pos.below(), Blocks.AIR.defaultBlockState(), 3);
         level.setBlock(pos, state, 3);
@@ -687,7 +700,7 @@ public final class VerifyServer {
         player.gameMode.destroyBlock(pos);
     }
 
-    private static int dropped(ServerLevel level, BlockPos pos, Item item) {
+    static int dropped(ServerLevel level, BlockPos pos, Item item) {
         return level.getEntitiesOfClass(ItemEntity.class, new AABB(pos).inflate(2)).stream()
                 .filter(e -> e.getItem().is(item)).mapToInt(e -> e.getItem().getCount()).sum();
     }
@@ -701,6 +714,10 @@ public final class VerifyServer {
                 {"lathe:" + MATERIAL + "_vstairs[facing=north]", "facing=east"},
                 {"lathe:" + MATERIAL + "_corner[eighth=top_north_east,type=outer_ns]", "eighth=top_south_east,type=outer_ew"},
                 {"lathe:" + MATERIAL + "_corner[eighth=bottom_south_west,type=inner]", "eighth=bottom_north_west,type=inner"},
+                {"lathe:" + MATERIAL + "_quarter[edge=north_east]", "edge=south_east"},
+                {"lathe:" + MATERIAL + "_quarter[edge=bottom_north]", "edge=bottom_east"},
+                {"lathe:" + MATERIAL + "_quarter[edge=top_west]", "edge=top_north"},
+                {"lathe:" + MATERIAL + "_eighth[eighth=bottom_north_east]", "eighth=bottom_south_east"},
                 {"lathe:" + MATERIAL + "_slab[type=top]", null},
         };
         for (String[] c : cases) {
@@ -780,6 +797,10 @@ public final class VerifyServer {
         report.info("vertical stairs placed: " + vstairs + " (their palette character is in few parts)");
         long corners = found.entrySet().stream().filter(e -> e.getKey().contains("_corner}")).mapToLong(Map.Entry::getValue).sum();
         report.check(corners > 0, "Lost Cities placed Lathe corners from a palette string with a state (" + corners + ")");
+        long quarters = found.entrySet().stream().filter(e -> e.getKey().contains("_quarter}")).mapToLong(Map.Entry::getValue).sum();
+        report.check(quarters > 0, "Lost Cities placed Lathe quarters from a palette string with a state (" + quarters + ")");
+        long eighths = found.entrySet().stream().filter(e -> e.getKey().contains("_eighth}")).mapToLong(Map.Entry::getValue).sum();
+        report.check(eighths > 0, "Lost Cities placed Lathe eighths from a palette string with a state (" + eighths + ")");
 
         // Lost Cities turns rotatable blocks in rotated parts (fronts, scattered buildings, highways, railways)
         // with LostCityTerrainFeature.transformBlockState. Run it on Lathe's states.
@@ -787,7 +808,9 @@ public final class VerifyServer {
                 mcjty.lostcities.setup.Registration.LOSTCITY_FEATURE.get()).getDimensionInfo(city);
         mcjty.lostcities.worldgen.LostCityTerrainFeature feature = dimension.getFeature();
         Map<String, String> placed = new TreeMap<>(PALETTE_SWAPS);
-        PALETTE_MIXES.forEach((c, block) -> placed.put(c + " (mixed in)", block));
+        PALETTE_MIXES.forEach((c, blocks) -> {
+            for (int i = 0; i < blocks.size(); i++) placed.put(c + " (mixed in " + (i + 1) + ")", blocks.get(i));
+        });
         for (Map.Entry<String, String> swap : placed.entrySet()) {
             BlockState state = Tools.stringToState(swap.getValue());
             boolean rotatable = !(state.getBlock() instanceof SlabBlock);

@@ -2,6 +2,7 @@ package com.rinkynooble.lathe.block;
 
 import com.rinkynooble.lathe.Material;
 import com.rinkynooble.lathe.Octants;
+import com.rinkynooble.lathe.Placement;
 import com.rinkynooble.lathe.Shape;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -25,6 +26,7 @@ import net.minecraft.world.level.pathfinder.PathComputationType;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Vertical stairs: a full-height block with one vertical quarter missing, an L in plan. The open quarter is the
@@ -78,12 +80,29 @@ public class LatheVerticalStairBlock extends Block implements ShapeBlock, Simple
         return true;
     }
 
+    /** The vertical stairs with exactly these eighths, or null when they aren't one of the 4. */
+    @Nullable
+    public BlockState byMask(int mask) {
+        for (Direction facing : Direction.Plane.HORIZONTAL) {
+            if (mask(facing) == mask) return defaultBlockState().setValue(FACING, facing);
+        }
+        return null;
+    }
+
     /**
-     * The open quarter faces the player, on the side of the block they aim at: looking north and aiming at the
-     * right half of a face leaves the south-east quarter open.
+     * Not sneaking, the vertical stairs the neighbours call for: where their partial faces overlap (stacking on
+     * another vertical stairs continues its column), else all they cover together (two vertical slabs in an L).
+     * Otherwise, and always when sneaking, the open quarter faces the player, on the side of the block they aim at:
+     * looking north and aiming at the right half of a face leaves the south-east quarter open.
      */
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
+        boolean water = context.getLevel().getFluidState(context.getClickedPos()).getType() == Fluids.WATER;
+        if (!context.isSecondaryUseActive()) {
+            BlockState fit = byMask(Placement.fitFromNeighbours(context.getLevel(), context.getClickedPos(), false));
+            if (fit == null) fit = byMask(Placement.fitFromNeighbours(context.getLevel(), context.getClickedPos(), true));
+            if (fit != null) return fit.setValue(WATERLOGGED, water);
+        }
         Direction look = context.getHorizontalDirection();
         Direction towardPlayer = look.getOpposite();
         Direction right = look.getClockWise();
@@ -91,7 +110,6 @@ public class LatheVerticalStairBlock extends Block implements ShapeBlock, Simple
         BlockPos pos = context.getClickedPos();
         double along = (hit.get(right.getAxis()) - pos.get(right.getAxis()) - 0.5) * right.getAxisDirection().getStep();
         Direction lateral = along > 0 ? right : right.getOpposite();
-        boolean water = context.getLevel().getFluidState(pos).getType() == Fluids.WATER;
         return defaultBlockState().setValue(FACING, facingForCorner(towardPlayer, lateral)).setValue(WATERLOGGED, water);
     }
 

@@ -7,8 +7,11 @@ import com.rinkynooble.lathe.Shape;
 import com.rinkynooble.lathe.block.CornerType;
 import com.rinkynooble.lathe.block.Eighth;
 import com.rinkynooble.lathe.block.LatheCornerBlock;
+import com.rinkynooble.lathe.block.LatheEighthBlock;
+import com.rinkynooble.lathe.block.LatheQuarterBlock;
 import com.rinkynooble.lathe.block.LatheVerticalSlabBlock;
 import com.rinkynooble.lathe.block.LatheVerticalStairBlock;
+import com.rinkynooble.lathe.block.QuarterEdge;
 import com.rinkynooble.lathe.block.VerticalSlabType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
@@ -60,17 +63,17 @@ import java.util.function.Consumer;
  */
 @Mod.EventBusSubscriber(modid = Lathe.MOD_ID, value = Dist.CLIENT)
 public final class VerifyClient {
-    private static final Report REPORT = new Report();
-    private static final List<Step> STEPS = new ArrayList<>();
+    static final Report REPORT = new Report();
+    static final List<Step> STEPS = new ArrayList<>();
     private static int tick;
     private static int stepIndex;
     private static int waitUntil;
-    private static final BlockPos ORIGIN = new BlockPos(0, 100, 0);
+    static final BlockPos ORIGIN = new BlockPos(0, 100, 0);
     /** The gallery's rows: the test rules' blocks of each kind. */
-    private static final List<String> GALLERY = List.of("lablink_blockz_0", "lairdecay_blockz_0", "myst_blockz_0",
+    static final List<String> GALLERY = List.of("lablink_blockz_0", "lairdecay_blockz_0", "myst_blockz_0",
             "cyberlight_alt_blockz_0", "tintedglass_blockz_0", "tintedglass_blockz_1", "ambercore_blockz_16");
 
-    private record Step(String name, int waitAfter, Runnable action) {
+    record Step(String name, int waitAfter, Runnable action) {
     }
 
     private VerifyClient() {
@@ -80,6 +83,7 @@ public final class VerifyClient {
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (!VerifyServer.ENABLED || event.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
+        proceedPastExperimentalWarning(mc);
         if (mc.level == null || mc.player == null || mc.getSingleplayerServer() == null) return;
         tick++;
         if (STEPS.isEmpty()) plan();
@@ -93,6 +97,23 @@ public final class VerifyClient {
             Lathe.LOG.error("Lathe client verify step failed", t);
         }
         waitUntil = tick + step.waitAfter;
+    }
+
+    /**
+     * A fresh copy of the verify server's world (Lost Cities makes it "experimental") opens with vanilla's warning
+     * screen; press its Proceed button so the run doesn't wait for a person.
+     */
+    private static void proceedPastExperimentalWarning(Minecraft mc) {
+        if (!(mc.screen instanceof net.minecraft.client.gui.screens.ConfirmScreen screen)) return;
+        if (!screen.getTitle().getString().contains("Experimental")) return;
+        for (var child : screen.children()) {
+            if (child instanceof net.minecraft.client.gui.components.Button button
+                    && button.getMessage().getString().equals(net.minecraft.network.chat.CommonComponents.GUI_PROCEED.getString())) {
+                Lathe.LOG.info("[verify] pressing Proceed on the experimental settings warning");
+                button.onPress();
+                return;
+            }
+        }
     }
 
     private static void plan() {
@@ -113,6 +134,7 @@ public final class VerifyClient {
         STEPS.add(new Step("look at the glass from the other side", 40, () -> look(new Vec3(ORIGIN.getX() + 9, ORIGIN.getY() + 2.6, ORIGIN.getZ() + 5 * 6 - 4.2), new Vec3(ORIGIN.getX() + 9, ORIGIN.getY() + 0.2, ORIGIN.getZ() + 5 * 6), true)));
         STEPS.add(new Step("screenshot glass from behind", 3, () -> screenshot("lathe-glass-behind.png")));
         addCornerSteps();
+        VerifyClientPieces.addSteps();
         // Placement through the real client: aim at the north strip of a stone block's top face, holding the slab.
         STEPS.add(new Step("aim to place", 20, () -> aimToPlace()));
         STEPS.add(new Step("screenshot placement outline", 5, () -> screenshot("lathe-outline-place.png")));
@@ -203,6 +225,21 @@ public final class VerifyClient {
             REPORT.check(inner.skipRendering(source, Direction.WEST), "a glass inner corner hides its full side against the glass block");
             REPORT.check(outer.skipRendering(bottom, Direction.EAST), "a glass outer corner hides its half side against a glass bottom slab");
             REPORT.check(!outer.skipRendering(bottom, Direction.WEST), "a glass outer corner shows its side with the eighth against a bottom slab (not covered)");
+        }
+        Block glassQuarter = glass.block(Shape.QUARTER), glassEighth = glass.block(Shape.EIGHTH);
+        REPORT.check(glassQuarter != null && glassEighth != null, "the test rules have quarters and eighths for tintedglass_blockz_1");
+        if (glassQuarter != null && glassEighth != null) {
+            BlockState pole = glassQuarter.defaultBlockState().setValue(LatheQuarterBlock.EDGE, QuarterEdge.NORTH_WEST);
+            BlockState beam = glassQuarter.defaultBlockState().setValue(LatheQuarterBlock.EDGE, QuarterEdge.BOTTOM_NORTH);
+            BlockState piece = glassEighth.defaultBlockState().setValue(LatheEighthBlock.EIGHTH, Eighth.BOTTOM_NORTH_WEST);
+            REPORT.check(pole.skipRendering(source, Direction.WEST), "a glass pole hides its side against the glass block");
+            REPORT.check(pole.skipRendering(pole, Direction.UP), "two glass poles stacked hide the faces between them");
+            REPORT.check(beam.skipRendering(beam, Direction.EAST), "two glass beams end to end hide the faces between them");
+            REPORT.check(beam.skipRendering(bottom, Direction.EAST), "a glass beam hides its end against a glass bottom slab");
+            REPORT.check(!pole.skipRendering(beam.setValue(LatheQuarterBlock.EDGE, QuarterEdge.BOTTOM_SOUTH), Direction.UP),
+                    "a glass pole shows its top under a beam that doesn't cover it");
+            REPORT.check(piece.skipRendering(bottom, Direction.WEST), "a glass eighth hides its side against a glass bottom slab");
+            REPORT.check(!piece.skipRendering(top, Direction.WEST), "a glass eighth shows its side against a glass top slab");
         }
         BlockState stoneSlab = stone.block(Shape.SLAB).defaultBlockState();
         REPORT.check(!stoneSlab.skipRendering(stoneSlab, Direction.EAST), "an opaque source's slabs don't use glass face hiding");
@@ -469,12 +506,12 @@ public final class VerifyClient {
 
     // ---- Camera and actions ----
 
-    private static net.minecraft.client.server.IntegratedServer server() {
+    static net.minecraft.client.server.IntegratedServer server() {
         return Minecraft.getInstance().getSingleplayerServer();
     }
 
     /** Puts the player's eye at {@code eye}, looking at {@code target}. */
-    private static void look(Vec3 eye, Vec3 target, boolean hideGui) {
+    static void look(Vec3 eye, Vec3 target, boolean hideGui) {
         Minecraft mc = Minecraft.getInstance();
         mc.options.hideGui = hideGui;
         Vec3 d = target.subtract(eye);
@@ -490,14 +527,14 @@ public final class VerifyClient {
         });
     }
 
-    private static void screenshot(String name) {
+    static void screenshot(String name) {
         Minecraft mc = Minecraft.getInstance();
         Consumer<net.minecraft.network.chat.Component> log = message -> Lathe.LOG.info("[verify] {}", message.getString());
         Screenshot.grab(mc.gameDirectory, name, mc.getMainRenderTarget(), log);
         REPORT.info("screenshot " + Path.of(mc.gameDirectory.getPath(), "screenshots", name));
     }
 
-    private static Material lablink() {
+    static Material lablink() {
         return Registration.MATERIALS.get(new ResourceLocation("betterblockz", "lablink_blockz_0"));
     }
 
