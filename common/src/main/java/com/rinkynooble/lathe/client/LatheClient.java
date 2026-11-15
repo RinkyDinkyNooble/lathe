@@ -38,11 +38,16 @@ public final class LatheClient {
         return (state, level, pos, tint) -> Minecraft.getInstance().getBlockColors().getColor(source, level, pos, tint);
     }
 
-    /** The item colour of a material's shapes, or null when the source has no item. */
-    public static @Nullable ItemColor itemColor(Material material) {
+    /** Looks up an item's colour the loader's way. */
+    public interface ItemColors {
+        int getColor(ItemStack stack, int tint);
+    }
+
+    /** The item colour of a material's shapes (the source item's), or null when the source has no item. */
+    public static @Nullable ItemColor itemColor(Material material, ItemColors colors) {
         ItemStack source = new ItemStack(material.source);
         if (source.isEmpty()) return null;
-        return (stack, tint) -> Minecraft.getInstance().getItemColors().getColor(source, tint);
+        return (stack, tint) -> colors.getColor(source, tint);
     }
 
     /**

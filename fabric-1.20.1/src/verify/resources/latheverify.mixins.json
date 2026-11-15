@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.rinkynooble.lathe.fabric.verify.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "VerifyPackRepositoryMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

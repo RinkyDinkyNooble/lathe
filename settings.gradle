@@ -15,3 +15,4 @@ rootProject.name = 'lathe'
 // Shared code lives in common/ (not a project of its own): each port folder compiles it into its own jar.
 // One folder per loader + Minecraft version.
 include 'forge-1.20.1'
+include 'fabric-1.20.1'

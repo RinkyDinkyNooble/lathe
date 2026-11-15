@@ -131,8 +131,8 @@ final class VerifyClientPieces {
 
     private static List<Material> materials() {
         List<Material> materials = new ArrayList<>();
-        for (String path : VerifyClient.GALLERY) {
-            Material material = Registration.MATERIALS.get(new ResourceLocation("betterblockz", path));
+        for (ResourceLocation id : VerifyPlatform.get().blocks().gallery()) {
+            Material material = TestBlocks.material(id);
             if (material != null && material.has(Shape.QUARTER) && material.has(Shape.EIGHTH)) materials.add(material);
         }
         return materials;
@@ -146,7 +146,7 @@ final class VerifyClientPieces {
             for (int k = 0; k < materials.size(); k++) {
                 Material material = materials.get(k);
                 BlockPos start = gallery(k);
-                boolean glass = material.sourceId.getPath().startsWith("tintedglass");
+                boolean glass = VerifyPlatform.get().blocks().isGlass(material.sourceId);
                 clear(level, start.offset(-3, 0, -3), start.offset(18, 8, 7));
                 BlockState floor = glass ? Blocks.RED_WOOL.defaultBlockState() : Blocks.SMOOTH_STONE.defaultBlockState();
                 fill(level, start.offset(-2, -1, -2), start.offset(16, -1, 6), floor);

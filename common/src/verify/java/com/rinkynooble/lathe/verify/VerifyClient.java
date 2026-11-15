@@ -41,13 +41,6 @@ import net.minecraft.world.level.block.state.properties.StairsShape;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.ChunkRenderTypeSet;
-import net.minecraftforge.client.model.data.ModelData;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.common.Mod;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -59,9 +52,9 @@ import java.util.function.Consumer;
 /**
  * Dev-only client checks (run with {@code gradlew runVerifyClient}; see README). Joins the world given by
  * {@code --quickPlaySingleplayer}, checks models, textures and names, builds a gallery of every shape next to its
- * source, takes screenshots, and tests placing and half-breaking through the real client. Never shipped.
+ * source, takes screenshots, and tests placing and half-breaking through the real client. Never shipped. The
+ * loader's client verify glue calls {@link #onClientTick()} at the end of every client tick.
  */
-@Mod.EventBusSubscriber(modid = Lathe.MOD_ID, value = Dist.CLIENT)
 public final class VerifyClient {
     static final Report REPORT = new Report();
     static final List<Step> STEPS = new ArrayList<>();
@@ -70,8 +63,9 @@ public final class VerifyClient {
     private static int waitUntil;
     static final BlockPos ORIGIN = new BlockPos(0, 100, 0);
     /** The gallery's rows: the test rules' blocks of each kind. */
-    static final List<String> GALLERY = List.of("lablink_blockz_0", "lairdecay_blockz_0", "myst_blockz_0",
-            "cyberlight_alt_blockz_0", "tintedglass_blockz_0", "tintedglass_blockz_1", "ambercore_blockz_16");
+    static List<ResourceLocation> gallery() {
+        return VerifyPlatform.get().blocks().gallery();
+    }
 
     record Step(String name, int waitAfter, Runnable action) {
     }
@@ -79,9 +73,8 @@ public final class VerifyClient {
     private VerifyClient() {
     }
 
-    @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (!VerifyServer.ENABLED || event.phase != TickEvent.Phase.END) return;
+    public static void onClientTick() {
+        if (!VerifyServer.ENABLED) return;
         Minecraft mc = Minecraft.getInstance();
         proceedPastExperimentalWarning(mc);
         if (mc.level == null || mc.player == null || mc.getSingleplayerServer() == null) return;
@@ -120,7 +113,7 @@ public final class VerifyClient {
         waitUntil = tick + 100;
         STEPS.add(new Step("models, textures and names", 1, VerifyClient::checkModels));
         STEPS.add(new Step("build the gallery", 10, VerifyClient::buildGallery));
-        for (int row = 0; row < GALLERY.size(); row++) {
+        for (int row = 0; row < gallery().size(); row++) {
             int r = row;
             int width = 2 * (1 + 18);
             for (int shot = 0; shot * 12 < width; shot++) {
@@ -167,9 +160,9 @@ public final class VerifyClient {
                     // Every face shows the texture the source shows on that side.
                     int quads = 0;
                     for (Direction cull : allDirections()) {
-                        for (BakedQuad quad : model.getQuads(state, cull, random, ModelData.EMPTY, null)) {
+                        for (BakedQuad quad : VerifyClientPlatform.get().quads(model, state, cull, random)) {
                             quads++;
-                            List<BakedQuad> sourceQuads = sourceModel.getQuads(sourceState, quad.getDirection(), random, ModelData.EMPTY, null);
+                            List<BakedQuad> sourceQuads = VerifyClientPlatform.get().quads(sourceModel, sourceState, quad.getDirection(), random);
                             if (sourceQuads.isEmpty()) continue;
                             BakedQuad expected = sourceQuads.get(0);
                             REPORT.check(quad.getSprite() == expected.getSprite(), name + " " + state + " " + quad.getDirection() + ": texture " + quad.getSprite().contents().name() + " vs " + expected.getSprite().contents().name());
@@ -179,9 +172,9 @@ public final class VerifyClient {
                     }
                     REPORT.check(quads > 0, name + " " + state + ": has faces");
                     REPORT.check(model.useAmbientOcclusion() == sourceModel.useAmbientOcclusion(), name + " " + state + ": ambient occlusion like the source");
-                    ChunkRenderTypeSet ours = model.getRenderTypes(state, random, ModelData.EMPTY);
-                    ChunkRenderTypeSet theirs = sourceModel.getRenderTypes(sourceState, random, ModelData.EMPTY);
-                    REPORT.check(ours.asList().equals(theirs.asList()), name + " " + state + ": render layer " + ours.asList() + " vs " + theirs.asList());
+                    String ours = VerifyClientPlatform.get().renderLayers(model, state, random);
+                    String theirs = VerifyClientPlatform.get().renderLayers(sourceModel, sourceState, random);
+                    REPORT.check(ours.equals(theirs), name + " " + state + ": render layer " + ours + " vs " + theirs);
                 }
                 Item item = material.items.get(shape);
                 if (item != null) {
@@ -196,15 +189,15 @@ public final class VerifyClient {
             }
         }
         checkGlassFaces();
-        REPORT.info("Embeddium loaded: " + ModList.get().isLoaded("embeddium") + ", Oculus loaded: " + ModList.get().isLoaded("oculus"));
+        REPORT.info(VerifyClientPlatform.get().renderers());
     }
 
     /** Faces between see-through shapes, and between them and their glass, are hidden as between two glass blocks. */
     private static void checkGlassFaces() {
-        Material glass = Registration.MATERIALS.get(new ResourceLocation("betterblockz", "tintedglass_blockz_1"));
+        Material glass = TestBlocks.material(VerifyPlatform.get().blocks().glass());
         Material stone = lablink();
         if (glass == null || stone == null) {
-            REPORT.check(false, "the test rules have tintedglass_blockz_1 and lablink_blockz_0");
+            REPORT.check(false, "the test rules have " + VerifyPlatform.get().blocks().glass() + " and " + VerifyPlatform.get().blocks().main());
             return;
         }
         BlockState source = glass.source.defaultBlockState();
@@ -218,7 +211,7 @@ public final class VerifyClient {
         REPORT.check(bottom.skipRendering(source, Direction.DOWN), "a glass slab hides its bottom on a glass block");
         REPORT.check(stairs.skipRendering(stairs.setValue(StairBlock.FACING, Direction.NORTH), Direction.EAST), "two glass stairs side by side hide the faces between them");
         Block glassCorner = glass.block(Shape.CORNER);
-        REPORT.check(glassCorner != null, "the test rules have corners for tintedglass_blockz_1");
+        REPORT.check(glassCorner != null, "the test rules have corners for " + glass.sourceId);
         if (glassCorner != null) {
             BlockState inner = glassCorner.defaultBlockState().setValue(LatheCornerBlock.EIGHTH, Eighth.TOP_SOUTH_EAST).setValue(LatheCornerBlock.TYPE, CornerType.INNER);
             BlockState outer = glassCorner.defaultBlockState().setValue(LatheCornerBlock.EIGHTH, Eighth.TOP_NORTH_WEST).setValue(LatheCornerBlock.TYPE, CornerType.OUTER_UD);
@@ -227,7 +220,7 @@ public final class VerifyClient {
             REPORT.check(!outer.skipRendering(bottom, Direction.WEST), "a glass outer corner shows its side with the eighth against a bottom slab (not covered)");
         }
         Block glassQuarter = glass.block(Shape.QUARTER), glassEighth = glass.block(Shape.EIGHTH);
-        REPORT.check(glassQuarter != null && glassEighth != null, "the test rules have quarters and eighths for tintedglass_blockz_1");
+        REPORT.check(glassQuarter != null && glassEighth != null, "the test rules have quarters and eighths for " + glass.sourceId);
         if (glassQuarter != null && glassEighth != null) {
             BlockState pole = glassQuarter.defaultBlockState().setValue(LatheQuarterBlock.EDGE, QuarterEdge.NORTH_WEST);
             BlockState beam = glassQuarter.defaultBlockState().setValue(LatheQuarterBlock.EDGE, QuarterEdge.BOTTOM_NORTH);
@@ -262,11 +255,11 @@ public final class VerifyClient {
             level.getGameRules().getRule(GameRules.RULE_WEATHER_CYCLE).set(false, server());
             level.setDayTime(6000);
             level.setWeatherParameters(6000, 0, false, false);
-            for (int row = 0; row < GALLERY.size(); row++) {
-                Material material = Registration.MATERIALS.get(new ResourceLocation("betterblockz", GALLERY.get(row)));
+            for (int row = 0; row < gallery().size(); row++) {
+                Material material = TestBlocks.material(gallery().get(row));
                 if (material == null) continue;
                 int z = ORIGIN.getZ() + row * 6;
-                boolean glass = GALLERY.get(row).startsWith("tintedglass");
+                boolean glass = VerifyPlatform.get().blocks().isGlass(gallery().get(row));
                 List<BlockState> states = new ArrayList<>();
                 states.add(material.source.defaultBlockState());
                 states.addAll(galleryStates(material));
@@ -289,7 +282,7 @@ public final class VerifyClient {
                 }
             }
             // A stone block to place on, and a double slab to break, beside the gallery.
-            Material lablink = Registration.MATERIALS.get(new ResourceLocation("betterblockz", "lablink_blockz_0"));
+            Material lablink = lablink();
             level.setBlock(placeBase(), Blocks.STONE.defaultBlockState(), 3);
             level.setBlock(placeBase().above(), Blocks.AIR.defaultBlockState(), 3);
             level.setBlock(breakPos().below(), Blocks.STONE.defaultBlockState(), 3);
@@ -335,8 +328,8 @@ public final class VerifyClient {
 
     private static List<Material> cornerMaterials() {
         List<Material> materials = new ArrayList<>();
-        for (String path : GALLERY) {
-            Material material = Registration.MATERIALS.get(new ResourceLocation("betterblockz", path));
+        for (ResourceLocation id : gallery()) {
+            Material material = TestBlocks.material(id);
             if (material != null && material.has(Shape.CORNER)) materials.add(material);
         }
         return materials;
@@ -351,7 +344,7 @@ public final class VerifyClient {
                 Material material = materials.get(k);
                 Block corner = material.block(Shape.CORNER);
                 BlockPos start = cornerGallery(k);
-                boolean glass = material.sourceId.getPath().startsWith("tintedglass");
+                boolean glass = VerifyPlatform.get().blocks().isGlass(material.sourceId);
                 for (int x = -2; x <= 16; x++) {
                     for (int z = -2; z <= 8; z++) {
                         BlockState floor = glass ? Blocks.RED_WOOL.defaultBlockState() : Blocks.SMOOTH_STONE.defaultBlockState();
@@ -534,8 +527,9 @@ public final class VerifyClient {
         REPORT.info("screenshot " + Path.of(mc.gameDirectory.getPath(), "screenshots", name));
     }
 
+    /** The main test block's material (BetterBlockZ's lab link on Forge, hence the name). */
     static Material lablink() {
-        return Registration.MATERIALS.get(new ResourceLocation("betterblockz", "lablink_blockz_0"));
+        return TestBlocks.material(VerifyPlatform.get().blocks().main());
     }
 
     private static void aimToPlace() {

@@ -16,6 +16,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
@@ -26,7 +27,6 @@ import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.common.util.FakePlayer;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -230,13 +230,13 @@ final class VerifyPieces {
     }
 
     private static Material lablink() {
-        return Registration.MATERIALS.get(new ResourceLocation("betterblockz", "lablink_blockz_0"));
+        return TestBlocks.material(VerifyPlatform.get().blocks().main());
     }
 
     private static void checkFitting(ServerLevel level, Report report) {
         Material material = lablink();
         if (material == null || !material.has(Shape.QUARTER) || !material.has(Shape.EIGHTH)) {
-            report.check(false, "the test rules have quarters and eighths for betterblockz:lablink_blockz_0");
+            report.check(false, "the test rules have quarters and eighths for " + VerifyPlatform.get().blocks().main());
             return;
         }
         Block vslab = material.block(Shape.VSLAB), slab = material.block(Shape.SLAB);
@@ -301,7 +301,7 @@ final class VerifyPieces {
      * stone block.
      */
     private static void fit(ServerLevel level, Report report, Scene scene, Item item, BlockState expected) {
-        FakePlayer player = VerifyServer.survivalPlayer(level);
+        ServerPlayer player = VerifyServer.survivalPlayer(level);
         BlockPos gap = gap(level);
         String what = name(item);
         for (Rotation rotation : Rotation.values()) {
@@ -323,7 +323,7 @@ final class VerifyPieces {
     }
 
     /** Builds the scene (or only a stone block where the click lands), clicks, and returns what's in the gap. */
-    private static BlockState place(ServerLevel level, FakePlayer player, Scene scene, Item item, Rotation rotation, boolean sneaking, boolean alone) {
+    private static BlockState place(ServerLevel level, ServerPlayer player, Scene scene, Item item, Rotation rotation, boolean sneaking, boolean alone) {
         BlockPos gap = gap(level);
         VerifyServer.clearAround(level, gap);
         if (alone) {
@@ -358,7 +358,7 @@ final class VerifyPieces {
     private static void checkAimInWorld(ServerLevel level, Report report) {
         Material material = lablink();
         if (material == null || !material.has(Shape.QUARTER) || !material.has(Shape.EIGHTH)) return;
-        FakePlayer player = VerifyServer.survivalPlayer(level);
+        ServerPlayer player = VerifyServer.survivalPlayer(level);
         player.moveTo(0.5, 100, 0.5, 0.0F, 0.0F);
         LatheQuarterBlock quarter = (LatheQuarterBlock) material.block(Shape.QUARTER);
         LatheEighthBlock eighth = (LatheEighthBlock) material.block(Shape.EIGHTH);
@@ -418,6 +418,6 @@ final class VerifyPieces {
     }
 
     private static String name(Item item) {
-        return String.valueOf(net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(item));
+        return String.valueOf(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item));
     }
 }

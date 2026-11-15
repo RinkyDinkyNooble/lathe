@@ -63,7 +63,7 @@ public class LatheSlabItem extends BlockItem {
 
     // Forge calls this (no @Override: Fabric has no such method).
     public void removeFromBlockToItemMap(Map<Block, Item> map, Item item) {
-        super.removeFromBlockToItemMap(map, item);
+        map.remove(getBlock()); // what Forge's own BlockItem does here
         if (material.slabItemPlacesBoth()) map.remove(material.block(Shape.VSLAB));
     }
 

@@ -94,7 +94,7 @@ public final class MemoryPack implements PackResources {
         return true;
     }
 
-    @Override
+    // Forge hides the pack from the pack screen (no @Override: vanilla and Fabric have no such method).
     public boolean isHidden() {
         return true;
     }

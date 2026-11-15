@@ -19,16 +19,14 @@ import com.rinkynooble.lathe.block.ShapeBlock;
 import com.rinkynooble.lathe.block.VerticalSlabType;
 import com.rinkynooble.lathe.pack.MemoryPack;
 import com.rinkynooble.lathe.pack.ModResources;
-import mcjty.lostcities.varia.Tools;
-import mcjty.lostcities.worldgen.LostTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.registries.Registries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackSource;
@@ -50,89 +48,81 @@ import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
-import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.common.util.FakePlayer;
-import net.minecraftforge.common.util.FakePlayerFactory;
-import net.minecraftforge.event.AddPackFindersEvent;
-import net.minecraftforge.event.server.ServerStartedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * Dev-only checks in a headless server (run with {@code gradlew runVerifyServer}; see README). Never shipped.
- * Writes {@code lathe-verify.txt} in the run folder and stops the server.
+ * Writes {@code lathe-verify.txt} in the run folder and stops the server. Each loader's verify glue calls in.
  */
-@Mod.EventBusSubscriber(modid = Lathe.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class VerifyServer {
-    static final boolean ENABLED = Boolean.getBoolean("lathe.verify");
-
-    static {
-        if (ENABLED) {
-            LogCapture.install();
-            MinecraftForge.EVENT_BUS.addListener(VerifyServer::onServerStarted);
-        }
-    }
+    public static final boolean ENABLED = Boolean.getBoolean("lathe.verify");
 
     private VerifyServer() {
     }
 
-    /**
-     * A data pack that swaps some of Lost Cities' default palette entries for Lathe shapes (with states), so
-     * generated cities place them.
-     */
-    @SubscribeEvent
-    public static void onAddPackFinders(AddPackFindersEvent event) {
-        if (!ENABLED || event.getPackType() != PackType.SERVER_DATA) return;
-        MemoryPack resources = new MemoryPack("lathe:verify_palette", PackType.SERVER_DATA, VerifyServer::palettePack);
-        Pack pack = Pack.readMetaAndCreate("lathe:verify_palette", Component.literal("Lathe verify palette"), true,
-                name -> resources, PackType.SERVER_DATA, Pack.Position.TOP, PackSource.BUILT_IN);
-        if (pack != null) event.addRepositorySource(consumer -> consumer.accept(pack));
+    /** Sets the loader's parts and starts capturing Lathe's warnings and errors. Called first by the verify glue. */
+    public static void install(VerifyPlatform platform) {
+        VerifyPlatform.set(platform);
+        LogCapture.install();
     }
 
-    static final String MATERIAL = "betterblockz__lablink_blockz_0";
-    static final Map<String, String> PALETTE_SWAPS = Map.of(
-            "_", "lathe:" + MATERIAL + "_slab[type=bottom]",
-            "=", "lathe:" + MATERIAL + "_vslab[facing=south,type=single]",
-            ")", "lathe:" + MATERIAL + "_vslab[facing=east,type=single]",
-            "c", "lathe:" + MATERIAL + "_stairs[facing=south,half=bottom,shape=straight]",
-            "d", "lathe:" + MATERIAL + "_vstairs[facing=north]");
+    /**
+     * A data pack that swaps some of Lost Cities' default palette entries for Lathe shapes (with states), so
+     * generated cities place them. The loader's verify glue adds it to the server's packs.
+     */
+    public static Pack palettePack() {
+        MemoryPack resources = new MemoryPack("lathe:verify_palette", PackType.SERVER_DATA, VerifyServer::palettePackFiles);
+        return Pack.readMetaAndCreate("lathe:verify_palette", Component.literal("Lathe verify palette"), true,
+                name -> resources, PackType.SERVER_DATA, Pack.Position.TOP, PackSource.BUILT_IN);
+    }
+
+    static String material() {
+        return VerifyPlatform.get().blocks().mainBaseName();
+    }
+    public static Map<String, String> paletteSwaps() {
+        return Map.of(
+            "_", "lathe:" + material() + "_slab[type=bottom]",
+            "=", "lathe:" + material() + "_vslab[facing=south,type=single]",
+            ")", "lathe:" + material() + "_vslab[facing=east,type=single]",
+            "c", "lathe:" + material() + "_stairs[facing=south,half=bottom,shape=straight]",
+            "d", "lathe:" + material() + "_vstairs[facing=north]");
+    }
+
     /**
      * Corners, quarters and eighths share a character with slabs (Lost Cities' "blocks" list: the slab half the
      * time, the others a quarter of the time each): the characters a palette names them with in practice aren't in
      * the parts nearest spawn.
      */
-    static final Map<String, List<String>> PALETTE_MIXES = Map.of(
-            "_", List.of("lathe:" + MATERIAL + "_corner[eighth=top_north_east,type=outer_ns]",
-                    "lathe:" + MATERIAL + "_quarter[edge=bottom_north]"),
-            "=", List.of("lathe:" + MATERIAL + "_corner[eighth=bottom_south_west,type=inner]",
-                    "lathe:" + MATERIAL + "_eighth[eighth=bottom_south_east]"));
+    public static Map<String, List<String>> paletteMixes() {
+        return Map.of(
+            "_", List.of("lathe:" + material() + "_corner[eighth=top_north_east,type=outer_ns]",
+                    "lathe:" + material() + "_quarter[edge=bottom_north]"),
+            "=", List.of("lathe:" + material() + "_corner[eighth=bottom_south_west,type=inner]",
+                    "lathe:" + material() + "_eighth[eighth=bottom_south_east]"));
+    }
 
-    private static Map<ResourceLocation, byte[]> palettePack() {
+    private static Map<ResourceLocation, byte[]> palettePackFiles() {
         Map<ResourceLocation, byte[]> files = new HashMap<>();
         JsonElement palette = ModResources.readJson("lostcities", "data/lostcities/lostcities/palettes/default.json");
         if (palette == null) return files;
         for (JsonElement entry : palette.getAsJsonObject().getAsJsonArray("palette")) {
             JsonObject object = entry.getAsJsonObject();
-            String swap = PALETTE_SWAPS.get(object.get("char").getAsString());
+            String swap = paletteSwaps().get(object.get("char").getAsString());
             if (swap != null) {
                 object.addProperty("block", swap);
                 object.remove("damaged");
             }
-            List<String> mix = PALETTE_MIXES.get(object.get("char").getAsString());
+            List<String> mix = paletteMixes().get(object.get("char").getAsString());
             if (swap != null && mix != null) {
                 com.google.gson.JsonArray blocks = new com.google.gson.JsonArray();
                 List<String> all = new java.util.ArrayList<>();
@@ -154,8 +144,7 @@ public final class VerifyServer {
         return files;
     }
 
-    private static void onServerStarted(ServerStartedEvent event) {
-        MinecraftServer server = event.getServer();
+    public static void onServerStarted(MinecraftServer server) {
         if (!server.isDedicatedServer()) return; // the client checks run in singleplayer
         Report report = new Report();
         try {
@@ -182,7 +171,7 @@ public final class VerifyServer {
         VerifyPieces.run(level, report);
         checkBreaking(level, report);
         checkLostCitiesParsing(report);
-        checkLostCitiesGeneration(server, report);
+        VerifyPlatform.get().lostCities().checkGeneration(server, report);
 
         for (String problem : LogCapture.PROBLEMS) {
             boolean ours = problem.contains("com.rinkynooble.lathe.Lathe:");
@@ -195,7 +184,7 @@ public final class VerifyServer {
 
     private static void checkBlocks(ServerLevel level, Report report) {
         BlockPos pos = new BlockPos(0, 100, 0);
-        FakePlayer player = FakePlayerFactory.getMinecraft(level);
+        ServerPlayer player = VerifyPlatform.get().fakePlayer(level);
         List<TagKey<Block>> toolTags = List.of(BlockTags.MINEABLE_WITH_PICKAXE, BlockTags.MINEABLE_WITH_AXE,
                 BlockTags.MINEABLE_WITH_SHOVEL, BlockTags.MINEABLE_WITH_HOE, BlockTags.NEEDS_STONE_TOOL,
                 BlockTags.NEEDS_IRON_TOOL, BlockTags.NEEDS_DIAMOND_TOOL);
@@ -206,7 +195,7 @@ public final class VerifyServer {
                 String name = material.sourceId + " " + shape.word;
                 report.check(block != null, name + ": registered");
                 if (block == null) continue;
-                ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
+                ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
                 report.check(id.equals(new ResourceLocation("lathe", material.baseName() + "_" + shape.suffix)), name + ": id is " + id);
                 for (BlockState state : block.getStateDefinition().getPossibleStates()) {
                     String at = name + " " + state;
@@ -224,7 +213,7 @@ public final class VerifyServer {
                 for (ItemStack tool : List.of(ItemStack.EMPTY, new ItemStack(Items.WOODEN_PICKAXE), new ItemStack(Items.DIAMOND_PICKAXE), new ItemStack(Items.DIAMOND_SHOVEL))) {
                     player.setItemInHand(InteractionHand.MAIN_HAND, tool.copy());
                     report.check(state.getDestroyProgress(player, level, pos) == source.getDestroyProgress(player, level, pos), name + ": mining speed with " + tool);
-                    report.check(state.canHarvestBlock(level, pos, player) == source.canHarvestBlock(level, pos, player), name + ": harvestable with " + tool);
+                    report.check(VerifyPlatform.get().canHarvest(state, level, pos, player) == VerifyPlatform.get().canHarvest(source, level, pos, player), name + ": harvestable with " + tool);
                 }
                 player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
                 for (TagKey<Block> tag : toolTags) {
@@ -232,7 +221,7 @@ public final class VerifyServer {
                 }
                 report.check(state.is(BlockTags.SLABS) == (shape == Shape.SLAB), name + ": in minecraft:slabs only when it's a slab");
                 report.check(state.is(BlockTags.STAIRS) == (shape == Shape.STAIRS), name + ": in minecraft:stairs only when it's stairs");
-                report.check(Tools.hasTag(block, LostTags.ROTATABLE_TAG) == (shape != Shape.SLAB), name + ": lostcities:rotatable");
+                report.check(VerifyPlatform.get().lostCities().isRotatable(block) == (shape != Shape.SLAB), name + ": lostcities:rotatable");
                 checkLoot(level, material, shape, block, report);
                 checkRecipes(level, material, shape, report);
             }
@@ -452,12 +441,12 @@ public final class VerifyServer {
      * Built in all four rotations; the corner item clicked on the wall in the gap.
      */
     private static void checkCornerPlacementInWorld(ServerLevel level, Report report) {
-        Material material = Registration.MATERIALS.get(new ResourceLocation("betterblockz", "lablink_blockz_0"));
+        Material material = TestBlocks.material(VerifyPlatform.get().blocks().main());
         if (material == null || !material.has(Shape.CORNER)) {
-            report.check(false, "the test rules have corners for betterblockz:lablink_blockz_0");
+            report.check(false, "the test rules have corners for " + VerifyPlatform.get().blocks().main());
             return;
         }
-        FakePlayer player = survivalPlayer(level);
+        ServerPlayer player = survivalPlayer(level);
         Item item = material.items.get(Shape.CORNER);
         LatheCornerBlock corner = (LatheCornerBlock) material.block(Shape.CORNER);
         BlockState latheStairs = material.block(Shape.STAIRS).defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH).setValue(StairBlock.HALF, Half.TOP);
@@ -558,27 +547,27 @@ public final class VerifyServer {
         for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class, new AABB(centre).inflate(5))) item.discard();
     }
 
-    static FakePlayer survivalPlayer(ServerLevel level) {
-        FakePlayer player = FakePlayerFactory.getMinecraft(level);
+    static ServerPlayer survivalPlayer(ServerLevel level) {
+        ServerPlayer player = VerifyPlatform.get().fakePlayer(level);
         player.setGameMode(GameType.SURVIVAL);
         return player;
     }
 
     /** Uses an item on a face of a block, like a right click at {@code hit}. */
-    static void use(FakePlayer player, ItemStack stack, BlockPos clicked, Direction face, Vec3 hit) {
+    static void use(ServerPlayer player, ItemStack stack, BlockPos clicked, Direction face, Vec3 hit) {
         player.setItemInHand(InteractionHand.MAIN_HAND, stack);
         BlockHitResult result = new BlockHitResult(hit, face, clicked, false);
         stack.useOn(new UseOnContext(player, InteractionHand.MAIN_HAND, result));
     }
 
     private static void checkPlacementInWorld(ServerLevel level, Report report) {
-        Material both = Registration.MATERIALS.get(new ResourceLocation("betterblockz", "lablink_blockz_0"));
-        Material nocombine = Registration.MATERIALS.get(new ResourceLocation("betterblockz", "myst_blockz_0"));
+        Material both = TestBlocks.material(VerifyPlatform.get().blocks().main());
+        Material nocombine = TestBlocks.material(VerifyPlatform.get().blocks().nocombine());
         if (both == null || nocombine == null) {
-            report.check(false, "the test rules have betterblockz:lablink_blockz_0 and betterblockz:myst_blockz_0");
+            report.check(false, "the test rules have " + VerifyPlatform.get().blocks().main() + " and " + VerifyPlatform.get().blocks().nocombine());
             return;
         }
-        FakePlayer player = survivalPlayer(level);
+        ServerPlayer player = survivalPlayer(level);
         BlockPos base = testSite(level);
         Item slabItem = both.items.get(Shape.SLAB);
         Block slab = both.block(Shape.SLAB), vslab = both.block(Shape.VSLAB);
@@ -651,9 +640,9 @@ public final class VerifyServer {
     }
 
     private static void checkBreaking(ServerLevel level, Report report) {
-        Material both = Registration.MATERIALS.get(new ResourceLocation("betterblockz", "lablink_blockz_0"));
+        Material both = TestBlocks.material(VerifyPlatform.get().blocks().main());
         if (both == null) return;
-        FakePlayer player = survivalPlayer(level);
+        ServerPlayer player = survivalPlayer(level);
         BlockPos pos = testSite(level).above();
         Block slab = both.block(Shape.SLAB), vslab = both.block(Shape.VSLAB);
         Item slabItem = both.items.get(Shape.SLAB);
@@ -687,11 +676,11 @@ public final class VerifyServer {
         reset(level, pos.below());
     }
 
-    static void breakAt(ServerLevel level, FakePlayer player, BlockPos pos, BlockState state, Vec3 feet, float pitch) {
+    static void breakAt(ServerLevel level, ServerPlayer player, BlockPos pos, BlockState state, Vec3 feet, float pitch) {
         breakAt(level, player, pos, state, feet, 0.0F, pitch);
     }
 
-    static void breakAt(ServerLevel level, FakePlayer player, BlockPos pos, BlockState state, Vec3 feet, float yaw, float pitch) {
+    static void breakAt(ServerLevel level, ServerPlayer player, BlockPos pos, BlockState state, Vec3 feet, float yaw, float pitch) {
         reset(level, pos.below());
         level.setBlock(pos.below(), Blocks.AIR.defaultBlockState(), 3);
         level.setBlock(pos, state, 3);
@@ -709,119 +698,35 @@ public final class VerifyServer {
 
     private static void checkLostCitiesParsing(Report report) {
         String[][] cases = {
-                {"lathe:" + MATERIAL + "_stairs[facing=north,half=bottom]", "facing=east"},
-                {"lathe:" + MATERIAL + "_vslab[facing=north,type=single]", "facing=east"},
-                {"lathe:" + MATERIAL + "_vstairs[facing=north]", "facing=east"},
-                {"lathe:" + MATERIAL + "_corner[eighth=top_north_east,type=outer_ns]", "eighth=top_south_east,type=outer_ew"},
-                {"lathe:" + MATERIAL + "_corner[eighth=bottom_south_west,type=inner]", "eighth=bottom_north_west,type=inner"},
-                {"lathe:" + MATERIAL + "_quarter[edge=north_east]", "edge=south_east"},
-                {"lathe:" + MATERIAL + "_quarter[edge=bottom_north]", "edge=bottom_east"},
-                {"lathe:" + MATERIAL + "_quarter[edge=top_west]", "edge=top_north"},
-                {"lathe:" + MATERIAL + "_eighth[eighth=bottom_north_east]", "eighth=bottom_south_east"},
-                {"lathe:" + MATERIAL + "_slab[type=top]", null},
+                {"lathe:" + material() + "_stairs[facing=north,half=bottom]", "facing=east"},
+                {"lathe:" + material() + "_vslab[facing=north,type=single]", "facing=east"},
+                {"lathe:" + material() + "_vstairs[facing=north]", "facing=east"},
+                {"lathe:" + material() + "_corner[eighth=top_north_east,type=outer_ns]", "eighth=top_south_east,type=outer_ew"},
+                {"lathe:" + material() + "_corner[eighth=bottom_south_west,type=inner]", "eighth=bottom_north_west,type=inner"},
+                {"lathe:" + material() + "_quarter[edge=north_east]", "edge=south_east"},
+                {"lathe:" + material() + "_quarter[edge=bottom_north]", "edge=bottom_east"},
+                {"lathe:" + material() + "_quarter[edge=top_west]", "edge=top_north"},
+                {"lathe:" + material() + "_eighth[eighth=bottom_north_east]", "eighth=bottom_south_east"},
+                {"lathe:" + material() + "_slab[type=top]", null},
         };
         for (String[] c : cases) {
             BlockState state;
             try {
-                state = Tools.stringToState(c[0]);
+                state = VerifyPlatform.get().lostCities().parse(c[0]);
             } catch (RuntimeException e) {
                 report.check(false, "Lost Cities reads " + c[0] + ": " + e);
                 continue;
             }
-            report.check(state != null && ForgeRegistries.BLOCKS.getKey(state.getBlock()).getNamespace().equals("lathe"), "Lost Cities reads " + c[0] + " as " + state);
+            report.check(state != null && BuiltInRegistries.BLOCK.getKey(state.getBlock()).getNamespace().equals("lathe"), "Lost Cities reads " + c[0] + " as " + state);
             if (state == null) continue;
-            boolean rotatable = Tools.hasTag(state.getBlock(), LostTags.ROTATABLE_TAG);
+            boolean rotatable = VerifyPlatform.get().lostCities().isRotatable(state.getBlock());
             report.check(rotatable == (c[1] != null), c[0] + ": rotatable by Lost Cities is " + rotatable);
             if (c[1] != null) {
                 BlockState turned = state.rotate(Rotation.CLOCKWISE_90);
                 report.check(turned.toString().contains(c[1]), c[0] + " turned 90 degrees: " + turned);
             }
         }
-        BlockState top = Tools.stringToState("lathe:" + MATERIAL + "_stairs[facing=north,half=top]");
-        report.check(top.getValue(StairBlock.HALF) == Half.TOP, "Lost Cities keeps half=top");
-    }
-
-    /**
-     * Generates part of a Lost Cities dimension with the verify palette and counts the Lathe shapes in it, by
-     * state. The palette only ever names vertical slabs facing south and vertical stairs facing north, so finding
-     * other facings proves Lost Cities rotated them in rotated parts.
-     */
-    private static void checkLostCitiesGeneration(MinecraftServer server, Report report) {
-        ServerLevel city = server.getLevel(ResourceKey.create(Registries.DIMENSION, new ResourceLocation("lostcities", "lostcity")));
-        if (city == null) {
-            report.check(false, "the lostcities:lostcity dimension exists");
-            return;
-        }
-        // Ask Lost Cities where its buildings are, nearest first, then generate those chunks only.
-        mcjty.lostcities.api.ILostCityInformation info = new mcjty.lostcities.LostCitiesImp().getLostInfo(city);
-        report.check(info != null, "Lost Cities runs in lostcities:lostcity");
-        if (info == null) return;
-        int wanted = Integer.getInteger("lathe.verify.buildings", 160);
-        List<int[]> chunks = new java.util.ArrayList<>();
-        for (int ring = 0; ring < 200 && chunks.size() < wanted; ring++) {
-            for (int cx = -ring; cx <= ring && chunks.size() < wanted; cx++) {
-                for (int cz = -ring; cz <= ring && chunks.size() < wanted; cz++) {
-                    if (Math.max(Math.abs(cx), Math.abs(cz)) != ring) continue;
-                    mcjty.lostcities.api.ILostChunkInfo chunkInfo = info.getChunkInfo(cx, cz);
-                    if (chunkInfo.isCity() && chunkInfo.getBuildingId() != null) chunks.add(new int[]{cx, cz});
-                }
-            }
-        }
-        report.info("Lost Cities building chunks found: " + chunks.size() + (chunks.isEmpty() ? "" : ", first at chunk " + chunks.get(0)[0] + "," + chunks.get(0)[1]));
-        Map<String, Integer> found = new TreeMap<>();
-        Map<String, Integer> others = new TreeMap<>();
-        long start = System.currentTimeMillis();
-        for (int[] c : chunks) {
-            LevelChunk chunk = city.getChunk(c[0], c[1]);
-            int minY = city.getMinBuildHeight(), maxY = city.getMaxBuildHeight();
-            BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-            for (int x = 0; x < 16; x++) {
-                for (int z = 0; z < 16; z++) {
-                    for (int y = minY; y < maxY; y++) {
-                        BlockState state = chunk.getBlockState(pos.set(x, y, z));
-                        if (state.getBlock() instanceof ShapeBlock) found.merge(state.toString(), 1, Integer::sum);
-                        else if (!state.isAir()) others.merge(ForgeRegistries.BLOCKS.getKey(state.getBlock()).toString(), 1, Integer::sum);
-                    }
-                }
-            }
-        }
-        report.info("generated " + chunks.size() + " Lost Cities building chunks in " + (System.currentTimeMillis() - start) / 1000 + " s");
-        found.forEach((state, count) -> report.info("  " + count + " x " + state));
-        others.entrySet().stream().sorted(Map.Entry.<String, Integer>comparingByValue().reversed()).limit(12)
-                .forEach(e -> report.info("  other blocks: " + e.getValue() + " x " + e.getKey()));
-        long vslabs = found.entrySet().stream().filter(e -> e.getKey().contains("_vslab}")).mapToLong(Map.Entry::getValue).sum();
-        report.check(found.keySet().stream().anyMatch(s -> s.contains("_slab}")), "Lost Cities placed Lathe slabs from a palette string with a state");
-        report.check(found.keySet().stream().anyMatch(s -> s.contains("_stairs}")), "Lost Cities placed Lathe stairs from a palette string with a state");
-        long vstairs = found.entrySet().stream().filter(e -> e.getKey().contains("_vstairs}")).mapToLong(Map.Entry::getValue).sum();
-        report.check(vslabs > 0, "Lost Cities placed Lathe vertical slabs (" + vslabs + ")");
-        report.info("vertical stairs placed: " + vstairs + " (their palette character is in few parts)");
-        long corners = found.entrySet().stream().filter(e -> e.getKey().contains("_corner}")).mapToLong(Map.Entry::getValue).sum();
-        report.check(corners > 0, "Lost Cities placed Lathe corners from a palette string with a state (" + corners + ")");
-        long quarters = found.entrySet().stream().filter(e -> e.getKey().contains("_quarter}")).mapToLong(Map.Entry::getValue).sum();
-        report.check(quarters > 0, "Lost Cities placed Lathe quarters from a palette string with a state (" + quarters + ")");
-        long eighths = found.entrySet().stream().filter(e -> e.getKey().contains("_eighth}")).mapToLong(Map.Entry::getValue).sum();
-        report.check(eighths > 0, "Lost Cities placed Lathe eighths from a palette string with a state (" + eighths + ")");
-
-        // Lost Cities turns rotatable blocks in rotated parts (fronts, scattered buildings, highways, railways)
-        // with LostCityTerrainFeature.transformBlockState. Run it on Lathe's states.
-        mcjty.lostcities.worldgen.IDimensionInfo dimension = ((mcjty.lostcities.worldgen.LostCityFeature)
-                mcjty.lostcities.setup.Registration.LOSTCITY_FEATURE.get()).getDimensionInfo(city);
-        mcjty.lostcities.worldgen.LostCityTerrainFeature feature = dimension.getFeature();
-        Map<String, String> placed = new TreeMap<>(PALETTE_SWAPS);
-        PALETTE_MIXES.forEach((c, blocks) -> {
-            for (int i = 0; i < blocks.size(); i++) placed.put(c + " (mixed in " + (i + 1) + ")", blocks.get(i));
-        });
-        for (Map.Entry<String, String> swap : placed.entrySet()) {
-            BlockState state = Tools.stringToState(swap.getValue());
-            boolean rotatable = !(state.getBlock() instanceof SlabBlock);
-            for (mcjty.lostcities.worldgen.lost.Transform transform : mcjty.lostcities.worldgen.lost.Transform.values()) {
-                BlockState turned = feature.transformBlockState(transform, state);
-                BlockState expected = rotatable ? state.rotate(transform.getMcRotation()) : state;
-                report.check(turned == expected, "Lost Cities " + transform + " turns " + swap.getValue() + " into " + turned);
-                if (rotatable && transform.getMcRotation() != Rotation.NONE) {
-                    report.check(turned != state, "Lost Cities " + transform + " changes " + swap.getValue());
-                }
-            }
-        }
+        BlockState top = VerifyPlatform.get().lostCities().parse("lathe:" + material() + "_stairs[facing=north,half=top]");
+        report.check(top != null && top.getValue(StairBlock.HALF) == Half.TOP, "Lost Cities keeps half=top");
     }
 }

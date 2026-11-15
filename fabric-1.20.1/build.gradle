@@ -1,0 +1,130 @@
+plugins {
+    id 'fabric-loom' version '1.7.4'
+}
+
+base {
+    archivesName = "${mod_id}-fabric-${fabric_minecraft_version}"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+// The shared code (common/) is compiled straight into this jar.
+sourceSets.main.java.srcDir rootProject.file('common/src/main/java')
+sourceSets.main.resources.srcDir rootProject.file('common/src/main/resources')
+
+// Dev-only checks (see README, "Testing"): a mod of their own, latheverify, never shipped with Lathe.
+sourceSets {
+    verify {
+        java.srcDir rootProject.file('common/src/verify/java')
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
+loom {
+    createRemapConfigurations(sourceSets.verify)
+    mixin {
+        add sourceSets.main, 'lathe-refmap.json'
+        add sourceSets.verify, 'latheverify-refmap.json'
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+        latheverify {
+            sourceSet sourceSets.verify
+        }
+    }
+
+    runs {
+        client {
+            runDir 'run'
+        }
+        server {
+            runDir 'run-server'
+        }
+        // A client and a server with the dev-only checks loaded too.
+        verifyClient {
+            inherit client
+            name 'Verify Client'
+            source sourceSets.verify
+            runDir 'run'
+            vmArg '-Dlathe.verify=true'
+            // Joins run/saves/lathe-test straight away (copied from the verify server's world; see README).
+            programArgs '--quickPlaySingleplayer', 'lathe-test', '--width', '1280', '--height', '720'
+        }
+        verifyServer {
+            inherit server
+            name 'Verify Server'
+            source sourceSets.verify
+            runDir 'run-server'
+            vmArg '-Dlathe.verify=true'
+        }
+    }
+}
+
+repositories {
+    // The Lost Cities' Fabric port, from libs/ (see README: its jar needs one line taken out of its manifest).
+    flatDir { dir 'libs' }
+    exclusiveContent {
+        forRepository { maven { url = 'https://api.modrinth.com/maven' } }
+        filter { includeGroup 'maven.modrinth' }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${fabric_minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+
+    // Loaded in the dev runs only. Lathe doesn't depend on any of them.
+    modLocalRuntime "local:lostcities-fabric:${lostcities_fabric_version}"
+    modLocalRuntime "maven.modrinth:forge-config-api-port:${forge_config_api_port_version}"
+    modVerifyCompileOnly "local:lostcities-fabric:${lostcities_fabric_version}"
+    if (project.hasProperty('withRenderers')) {
+        modLocalRuntime "maven.modrinth:sodium:${sodium_version}"
+        modLocalRuntime "maven.modrinth:iris:${iris_version}"
+    }
+}
+
+processResources {
+    var replaceProperties = [
+            version: mod_version, mod_id: mod_id, mod_name: mod_name, mod_license: mod_license,
+            mod_authors: mod_authors, mod_description: mod_description, mod_url: mod_url, mod_issues: mod_issues,
+            minecraft_version_range: fabric_minecraft_version_range,
+            loader_version_range: fabric_loader_version_range, fabric_api_version_range: fabric_api_version_range,
+    ]
+    inputs.properties replaceProperties
+    filesMatching('fabric.mod.json') {
+        expand replaceProperties
+    }
+}
+
+processVerifyResources {
+    inputs.property 'version', mod_version
+    filesMatching('fabric.mod.json') {
+        expand version: mod_version
+    }
+}
+
+jar {
+    // Ship the license inside the jar too.
+    from(rootProject.file('LICENSE')) {
+        rename { "LICENSE_${mod_id}" }
+    }
+}
+
+// The checks as a mod jar of their own, for real Fabric and Quilt servers (see README). Never shipped.
+tasks.register('verifyJar', Jar) {
+    archiveClassifier = 'verify-dev'
+    from sourceSets.verify.output
+    destinationDirectory = layout.buildDirectory.dir('devlibs')
+}
+tasks.register('remapVerifyJar', net.fabricmc.loom.task.RemapJarTask) {
+    dependsOn 'verifyJar'
+    inputFile = tasks.named('verifyJar').flatMap { it.archiveFile }
+    archiveClassifier = 'verify'
+    addNestedDependencies = false
+}

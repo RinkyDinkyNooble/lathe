@@ -10,12 +10,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Collects check results and writes them to a file the test script reads. */
-final class Report {
+public final class Report {
     private final List<String> lines = new ArrayList<>();
     private int passed;
     private int failed;
 
-    void check(boolean ok, String what) {
+    public void check(boolean ok, String what) {
         if (ok) {
             passed++;
         } else {
@@ -24,7 +24,7 @@ final class Report {
         }
     }
 
-    void info(String line) {
+    public void info(String line) {
         lines.add("INFO " + line);
     }
 

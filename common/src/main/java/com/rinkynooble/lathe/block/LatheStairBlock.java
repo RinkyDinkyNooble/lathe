@@ -28,7 +28,8 @@ public class LatheStairBlock extends StairBlock implements ShapeBlock {
     private final Material material;
 
     public LatheStairBlock(Material material) {
-        super(() -> material.source.defaultBlockState(), ShapeBlock.properties(material.source));
+        // Vanilla's constructor (Forge keeps it, as a supplier of this same state).
+        super(material.source.defaultBlockState(), ShapeBlock.properties(material.source));
         this.material = material;
     }
 

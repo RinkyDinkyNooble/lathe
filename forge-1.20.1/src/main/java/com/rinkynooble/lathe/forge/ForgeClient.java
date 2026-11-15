@@ -3,6 +3,7 @@ package com.rinkynooble.lathe.forge;
 import com.rinkynooble.lathe.Material;
 import com.rinkynooble.lathe.Registration;
 import com.rinkynooble.lathe.client.LatheClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.item.ItemColor;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
@@ -35,7 +36,7 @@ final class ForgeClient {
 
     private static void onItemColors(RegisterColorHandlersEvent.Item event) {
         for (Material material : Registration.MATERIALS.values()) {
-            ItemColor color = LatheClient.itemColor(material);
+            ItemColor color = LatheClient.itemColor(material, (stack, tint) -> Minecraft.getInstance().getItemColors().getColor(stack, tint));
             if (color != null) event.register(color, material.items.values().toArray(BlockItem[]::new));
         }
     }
