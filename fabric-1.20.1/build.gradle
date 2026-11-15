@@ -139,6 +139,8 @@ tasks.register('verifyJar', Jar) {
 tasks.register('remapVerifyJar', net.fabricmc.loom.task.RemapJarTask) {
     dependsOn 'verifyJar'
     inputFile = tasks.named('verifyJar').flatMap { it.archiveFile }
+    // Lathe's own classes, so calls through its block types get the game's runtime names too.
+    classpath.from(sourceSets.main.output.classesDirs)
     archiveClassifier = 'verify'
     addNestedDependencies = false
 }
