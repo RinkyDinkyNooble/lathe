@@ -5,6 +5,7 @@ build/
 # Dev runs (in each port folder)
 run/
 run-server/
+run-join/
 
 # The dev runs' mod jars go here (see README)
 libs/

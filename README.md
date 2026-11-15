@@ -244,7 +244,7 @@ The Fabric version is the same mod: the same rules files, ids, block states, pla
 - **Render layers.** Fabric mods set a block's render layer in code, not in its model; each shape gets its source's layer from there.
 - **Packs.** The generated resource and data packs are always on, as on Forge. On Fabric the resource pack shows in the pack list as "Lathe's shapes", fixed in place.
 - **Reach.** Choosing which half of a double slab breaks uses vanilla's reach (Forge uses its reach attribute).
-- **Lost Cities.** McJty's The Lost Cities is Forge-only; its [Fabric port](https://www.curseforge.com/minecraft/mc-mods/lostcities-fabric) by sunshainy reads the same palettes, and Lathe's checks generate and rotate cities with it.
+- **Lost Cities.** McJty's The Lost Cities is Forge-only; its [Fabric port](https://www.curseforge.com/minecraft/mc-mods/lostcities-fabric) by sunshainy reads the same palettes, and Lathe's checks generate and rotate cities with it. That port needs Minecraft 1.20.1: on 1.20 it needs a newer Fabric API than 1.20 has, so it doesn't start there (Lathe itself does).
 - **Scalpel** is Forge-only, so the [Scalpel](#scalpel) section doesn't apply.
 
 ## Limits

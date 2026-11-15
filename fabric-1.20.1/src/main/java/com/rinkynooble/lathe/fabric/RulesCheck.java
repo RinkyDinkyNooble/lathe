@@ -33,15 +33,20 @@ final class RulesCheck {
         });
         ServerLoginNetworking.registerGlobalReceiver(CHANNEL, (server, handler, understood, buf, synchronizer, responseSender) -> {
             String ours = Lathe.rules.hash;
+            Component refusal = null;
             if (!understood) {
-                handler.disconnect(Component.literal("This server uses Lathe. Install Lathe with the same config/lathe/ rules as the server (rules hash " + ours + ")."));
-                return;
+                refusal = Component.literal("This server uses Lathe. Install Lathe with the same config/lathe/ rules as the server (rules hash " + ours + ").");
+            } else {
+                String theirs = buf.readUtf();
+                if (!theirs.equals(ours)) {
+                    refusal = Component.literal("Lathe's rules differ: the server's hash is " + ours + ", yours is " + theirs
+                            + ". The client and the server need the same config/lathe/ rules.");
+                }
             }
-            String theirs = buf.readUtf();
-            if (!theirs.equals(ours)) {
-                handler.disconnect(Component.literal("Lathe's rules differ: the server's hash is " + ours + ", yours is " + theirs
-                        + ". The client and the server need the same config/lathe/ rules."));
-            }
+            if (refusal == null) return;
+            // Replies arrive on the network thread; disconnect from the server thread, holding the login until then.
+            Component message = refusal;
+            synchronizer.waitFor(server.submit(() -> handler.disconnect(message)));
         });
     }
 
