@@ -2,12 +2,12 @@
 .gradle/
 build/
 
-# Forge dev runs
+# Dev runs (in each port folder)
 run/
 run-server/
 
 # The dev runs' mod jars go here (see README)
-/libs
+libs/
 
 # IDEs
 .idea/
