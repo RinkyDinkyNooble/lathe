@@ -1,10 +1,12 @@
 # Lathe
 
-Lathe is a Forge mod for modpack makers. It makes slabs, vertical slabs, stairs, vertical stairs, corners, quarters and eighths for the blocks you list, and only those. Each shape is a real block with its own stable id, looks like its source block, mines and sounds like it, and can be used in Lost Cities palettes.
+Lathe is a mod for modpack makers, for Forge and Fabric. It makes slabs, vertical slabs, stairs, vertical stairs, corners, quarters and eighths for the blocks you list, and only those. Each shape is a real block with its own stable id, looks like its source block, mines and sounds like it, and can be used in Lost Cities palettes.
 
 It was made for the ABZA modpack, whose city palettes use BetterBlockZ (1,498 full blocks, no slabs or stairs), but it works with any mod's full blocks.
 
-- Minecraft 1.20.1, Forge 47.4.10 or later
+- Minecraft 1.20.1 on Forge 47.4.10 or later
+- Minecraft 1.20 or 1.20.1 on Fabric Loader 0.15 or later, with Fabric API 0.83 or later; also runs on Quilt with Quilted Fabric API
+- The same rules files, ids and block states on both loaders
 - Needed on both the client and the server, with the same rules (see [Same rules on both sides](#same-rules-on-both-sides))
 - License: 0BSD
 
@@ -22,6 +24,7 @@ It was made for the ABZA modpack, whose city palettes use BetterBlockZ (1,498 fu
 - [Same rules on both sides](#same-rules-on-both-sides)
 - [Startup log](#startup-log)
 - [Scalpel](#scalpel)
+- [Fabric](#fabric)
 - [Limits](#limits)
 - [Building and testing](#building-and-testing)
 - [Inspiration](#inspiration)
@@ -200,15 +203,18 @@ Generated into a data pack held in memory, always on:
 - **Stonecutter**, from the source: 2 slabs, 1 stairs, 2 vertical slabs (when they have their own item), 1 vertical stairs, 1 corner, 4 quarters, 8 eighths. Quarters and eighths have no recipe back.
 - **Crafting**: two slabs back into the source block (stacked; side by side for vertical slabs with their own item).
 - **Loot**: each shape drops itself (every corner, quarter and eighth drops one of itself); a double slab drops two; explosions may destroy some, as with vanilla slabs.
-- **Tags**: `minecraft:slabs` and `minecraft:stairs` (blocks and items); `lostcities:rotatable` for vertical slabs, vertical stairs, corners, quarters and eighths (none of these are in `minecraft:slabs` or `minecraft:stairs`); the source's tool tags (`minecraft:mineable/*`, `minecraft:needs_*_tool`, `forge:needs_*_tool`), read from the tag files in every mod's jar, nested tags included.
+- **Tags**: `minecraft:slabs` and `minecraft:stairs` (blocks and items); `lostcities:rotatable` for vertical slabs, vertical stairs, corners, quarters and eighths (none of these are in `minecraft:slabs` or `minecraft:stairs`); the source's tool tags (`minecraft:mineable/*`, `minecraft:needs_*_tool`, and on Forge `forge:needs_*_tool`, on Fabric `fabric:needs_tool_level_*` and `fabric:mineable/*`), read from the tag files in every mod's jar, nested tags included.
 
 Sources without an item get no recipes.
 
 ## Same rules on both sides
 
-The shapes are registry entries, so a client and a server with different rules can't play together: Forge's registry sync refuses the connection. Ship `config/lathe/` to both, like any other config.
+The shapes are registry entries, so a client and a server with different rules can't play together: the loader's registry sync refuses the connection. Ship `config/lathe/` to both, like any other config.
 
-Lathe also opens a network channel, `lathe:rules`, whose version is a hash of the rules (comments and spacing don't count). When the rules differ, Forge's disconnect screen names that channel with both hashes, which is clearer than a list of missing blocks. The hash is in the startup log.
+Lathe also compares a hash of the rules (comments and spacing don't count) when a player joins, which is clearer than a list of missing blocks. The hash is in the startup log.
+
+- **Forge**: a network channel, `lathe:rules`, versioned by the hash. When the rules differ, Forge's disconnect screen names that channel with both hashes.
+- **Fabric**: the server asks the client for its hash while it logs in. When they differ, the player is disconnected with both hashes and "The client and the server need the same config/lathe/ rules". A server whose rules make no shapes doesn't ask, so vanilla clients can still join it.
 
 ## Startup log
 
@@ -230,6 +236,17 @@ Lathe and [Scalpel](https://github.com/RinkyDinkyNooble/scalpel) work together i
 - A source block Scalpel **hides** is still a normal block, so its shapes are made as usual. Hide the shapes too with a Scalpel rule on their ids (`hide block lathe:minecraft__calcite_*`).
 - Scalpel rules can cut Lathe's own shapes like any other mod's content.
 
+## Fabric
+
+The Fabric version is the same mod: the same rules files, ids, block states, placing, recipes, drops and tags, from the same code. What differs is how it hooks in:
+
+- **When shapes are made.** Fabric has no "every mod has registered" moment, so Lathe makes a block's shapes the moment that block registers, whichever mod registers it and whenever. The startup log's summary comes once every mod has started.
+- **Render layers.** Fabric mods set a block's render layer in code, not in its model; each shape gets its source's layer from there.
+- **Packs.** The generated resource and data packs are always on, as on Forge. On Fabric the resource pack shows in the pack list as "Lathe's shapes", fixed in place.
+- **Reach.** Choosing which half of a double slab breaks uses vanilla's reach (Forge uses its reach attribute).
+- **Lost Cities.** McJty's The Lost Cities is Forge-only; its [Fabric port](https://www.curseforge.com/minecraft/mc-mods/lostcities-fabric) by sunshainy reads the same palettes, and Lathe's checks generate and rotate cities with it.
+- **Scalpel** is Forge-only, so the [Scalpel](#scalpel) section doesn't apply.
+
 ## Limits
 
 - Only full-cube sources. Shapes of a block's own non-cube model (a lamp, a plate) aren't made.
@@ -245,14 +262,20 @@ Lathe and [Scalpel](https://github.com/RinkyDinkyNooble/scalpel) work together i
 gradlew build
 ```
 
-The jar is in `build/libs/`. JDK 17.
+JDK 17. The jars are `forge-1.20.1/build/libs/lathe-forge-1.20.1-<version>.jar` and `fabric-1.20.1/build/libs/lathe-fabric-1.20.1-<version>.jar`.
 
-The dev runs load BetterBlockZ, The Lost Cities, and (with `-PwithRenderers`) Embeddium and Oculus from `libs/`, which isn't in the repo. Put these jars there, named as `gradle.properties` expects: `betterblockz-0.2.10.jar`, `lostcities-7.5.6.jar`, `embeddium-0.3.31.jar`, `oculus-1.8.0.jar`.
+The code lives in three folders. `common/` holds everything the loaders share (the rules, the blocks, placing, the generated packs, the client's outlines) and isn't built on its own: each port folder compiles it into its own jar. `forge-1.20.1/` and `fabric-1.20.1/` hold what each loader does its own way: the entry point, registering the shapes, adding the packs, client events, and a small `Platform` with the rest. A port for another loader or Minecraft version is another such folder.
 
-Dev-only checks live in `src/verify` and are never shipped:
+The dev runs need mods that aren't in the repo:
+
+- **Forge**: BetterBlockZ, The Lost Cities, and (with `-PwithRenderers`) Embeddium and Oculus, in `forge-1.20.1/libs/`, named as `gradle.properties` expects: `betterblockz-0.2.10.jar`, `lostcities-7.5.6.jar`, `embeddium-0.3.31.jar`, `oculus-1.8.0.jar`.
+- **Fabric**: the Lost Cities Fabric port in `fabric-1.20.1/libs/lostcities-fabric-1.2.0.jar`. Its jar is built with a newer Loom than this build uses, so take the `Fabric-Loom-Version` line out of its `META-INF/MANIFEST.MF` first. Forge Config API Port (which it needs) and, with `-PwithRenderers`, Sodium and Iris come from Modrinth's maven.
+
+Dev-only checks live in `common/src/verify` (shared) and each port's `src/verify` (its glue), and are never shipped. Run them per port, like `gradlew :forge-1.20.1:runVerifyServer` or `gradlew :fabric-1.20.1:runVerifyClient`. Both ports run the same checks; the test rules (in `run-server/config/lathe/` and `run/config/lathe/` of each port) use BetterBlockZ's blocks on Forge and vanilla blocks on Fabric, in the same roles.
 
 - `gradlew runVerifyServer` starts a headless server in `run-server/` with the rules in `run-server/config/lathe/`, runs the checks, writes `run-server/lathe-verify.txt` and stops. It checks every shape of every rule against its source (hardness, light, sound, map colour, tool needs, see-through-ness, mining speed and harvesting with several tools, tool tags), that no shape ticks or has a block entity, loot for every state, stonecutter and crafting recipes, slab, stairs and Lost Cities tags, the placement maths, placing and half-breaking with a player in the world (drops counted), and that nothing about Lathe was logged as an error. For corners it checks all 32 pieces' shapes, that rotating and mirroring each one turns its eighths the same way, the placing maths, and placing in the world: upside-down stairs along a wall with vertical stairs below, with and without sneaking, in all four rotations, with Lathe's and vanilla stairs, then by aim on an open floor and beside a single slab. For quarters and eighths it checks all 12 and 8 pieces the same way, the aim maths on floors, ceilings and walls (and that every piece can be reached), and fitting in the world in all four rotations: both kinds of L of vertical slabs (a pole, or vertical stairs with the vertical stairs item), a beam continued end-on, a pole and vertical stairs stacked, three slabs meeting (an eighth), sneaking going by aim, neighbours calling for some other piece, water and drops. Then it swaps some of Lost Cities' default palette entries for Lathe shapes with states (corners, quarters and eighths mixed in), generates 160 Lost Cities building chunks, counts the shapes placed, and runs Lost Cities' own rotation code on them.
 - `gradlew runVerifyClient` (add `-PwithRenderers` for Embeddium and Oculus) joins `run/saves/lathe-test` (a copy of the verify server's world), checks that every state of every shape has a model whose faces use the source's textures, shading, tint, ambient occlusion and render layer, checks item models and names, builds a gallery of every shape next to its source, of all 32 corner pieces, and of all 12 quarters and 8 eighths, takes screenshots into `run/screenshots/`, and places and half-breaks through the real client: an outer corner and (sneaking) an inner corner where stairs meet vertical stairs, two poles closing an L of vertical slabs (next to the same L left empty), a beam along a floor-wall edge continued end-on, and an eighth where three slabs meet. It writes `run/lathe-verify-client.txt` and quits.
+- `gradlew :fabric-1.20.1:remapVerifyJar` builds the Fabric checks as a mod of their own (`fabric-1.20.1/build/libs/lathe-fabric-1.20.1-<version>-verify.jar`). Put it with Lathe's jar in a real Fabric or Quilt server's `mods/`, with the vanilla test rules, Lost Cities' Fabric port and Forge Config API Port, and start the server with `-Dlathe.verify=true`: it runs the same server checks on the real game, writes `lathe-verify.txt` and stops.
 
 ## Inspiration
 

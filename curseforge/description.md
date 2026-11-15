@@ -9,6 +9,7 @@ Lathe makes **slabs, vertical slabs, stairs, vertical stairs, corners, quarters 
 <table>
   <tr><th align="left">What</th><th align="left">Version</th></tr>
   <tr><td><strong>Forge</strong></td><td>47.4.10 or later</td></tr>
+  <tr><td><strong>Fabric</strong></td><td>Loader 0.15 or later, with <a href="https://www.curseforge.com/minecraft/mc-mods/fabric-api">Fabric API</a> (on Quilt, Quilted Fabric API)</td></tr>
   <tr><td><strong>Sides</strong></td><td><span style="color:#e03e2d"><strong>Client and server</strong></span>, with the same rules files</td></tr>
 </table>
 
@@ -90,6 +91,8 @@ slab vstairs minecraft:glass nocombine
 ## Lost Cities
 
 Every shape has an id that never changes, like `lathe:minecraft__calcite_stairs`, so Lost Cities palettes can use them with a state (`[facing=north,half=bottom]`). Stairs, vertical slabs, vertical stairs, corners, quarters and eighths turn with the parts Lost Cities rotates. Corners, quarters and eighths never change shape when their neighbours change, so they stay as the palette says.
+
+On Fabric, the same works with the [Fabric port of The Lost Cities](https://www.curseforge.com/minecraft/mc-mods/lostcities-fabric).
 
 ***
 

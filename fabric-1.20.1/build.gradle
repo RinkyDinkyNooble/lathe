@@ -61,6 +61,15 @@ loom {
             runDir 'run-server'
             vmArg '-Dlathe.verify=true'
         }
+        // Joins the dev server (gradlew runServer) and records what happened, for the rules check (see README).
+        joinClient {
+            inherit client
+            name 'Join Client'
+            source sourceSets.verify
+            runDir 'run-join'
+            vmArg '-Dlathe.verify.join=true'
+            programArgs '--quickPlayMultiplayer', 'localhost:25565', '--width', '854', '--height', '480'
+        }
     }
 }
 

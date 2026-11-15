@@ -1,3 +1,12 @@
+## 0.3.0 for Fabric (2026-11-15)
+
+First Fabric version, for Minecraft 1.20 and 1.20.1 with Fabric API. It also runs on Quilt with Quilted Fabric API.
+
+- The same as 0.3.0 for Forge: slabs, vertical slabs, stairs, vertical stairs, corners, quarters and eighths, placing by aim, half-breaking, recipes, drops and tags.
+- The same rules files, ids and block states as on Forge, so rules and Lost Cities palettes work on both.
+- Works with the Fabric port of The Lost Cities.
+- Needed on the client and the server, with the same rules.
+
 ## 0.3.0 (2026-11-12)
 
 - Added: quarters, a new `quarters` rule word. One block per source holds 12 quarters, each half a vertical slab: upright poles at the corners and beams lying along the edges.
