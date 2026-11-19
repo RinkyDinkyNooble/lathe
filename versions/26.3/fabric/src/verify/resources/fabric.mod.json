@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "latheverify",
+  "version": "${version}",
+  "name": "Lathe checks (dev only)",
+  "description": "Lathe's dev-only checks. Never shipped. Runs only with -Dlathe.verify=true.",
+  "license": "0BSD",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.rinkynooble.lathe.fabric.verify.FabricVerify"],
+    "client": ["com.rinkynooble.lathe.fabric.verify.FabricVerifyClient"]
+  },
+  "mixins": ["latheverify.mixins.json"],
+  "depends": {
+    "lathe": "*",
+    "fabric-api": "*"
+  }
+}
