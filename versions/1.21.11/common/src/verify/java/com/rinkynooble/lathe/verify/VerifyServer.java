@@ -35,6 +35,7 @@ import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -178,6 +179,7 @@ public final class VerifyServer {
         ServerLevel level = server.overworld();
         report.check(!Registration.MATERIALS.isEmpty(), "rules made some materials");
         for (String warning : Registration.WARNINGS) report.info("startup warning: " + warning);
+        loadTestSite(level, report);
 
         checkBlocks(level, report);
         checkPlacementMaths(report);
@@ -653,7 +655,24 @@ public final class VerifyServer {
         reset(level, base);
     }
 
-    /** Near spawn, where chunks stay loaded with their entities, so drops can be counted. */
+    /**
+     * Since 1.21.9 no spawn chunks stay loaded, so the test site's chunks are forced, and the game's pending chunk
+     * work is run now (the checks run inside one server task) until entities there are tracked: drops are counted
+     * as item entities. Before 1.21.9 the spawn chunks were already like that.
+     */
+    private static void loadTestSite(ServerLevel level, Report report) {
+        ChunkPos centre = new ChunkPos(testSite(level));
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) level.setChunkForced(centre.x + dx, centre.z + dz, true);
+        }
+        long deadline = System.currentTimeMillis() + 60_000;
+        while (!level.isPositionEntityTicking(centre.getWorldPosition()) && System.currentTimeMillis() < deadline) {
+            if (!level.getChunkSource().pollTask()) java.util.concurrent.locks.LockSupport.parkNanos(1_000_000L);
+        }
+        report.info("test site chunks forced around chunk " + centre.x + "," + centre.z + ", entities tracked: " + level.isPositionEntityTicking(centre.getWorldPosition()));
+    }
+
+    /** Near spawn, in chunks kept loaded with their entities (see loadTestSite), so drops can be counted. */
     static BlockPos testSite(ServerLevel level) {
         BlockPos spawn = level.getRespawnData().pos();
         return new BlockPos(spawn.getX() + 4, 100, spawn.getZ() + 4);
