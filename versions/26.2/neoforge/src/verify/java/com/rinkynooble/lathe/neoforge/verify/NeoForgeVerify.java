@@ -38,7 +38,7 @@ public final class NeoForgeVerify implements VerifyPlatform {
     private LostCities lostCities;
 
     public NeoForgeVerify(IEventBus modBus, Dist dist) {
-        if (dist.isClient()) NeoForgeVerifyClient.init();
+        if (dist.isClient()) NeoForgeVerifyClient.init(modBus);
         if (!VerifyServer.ENABLED) return;
         VerifyServer.install(this);
         modBus.addListener(NeoForgeVerify::onAddPackFinders);
