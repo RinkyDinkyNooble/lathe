@@ -7,6 +7,8 @@ version="${mod_version}"
 displayName="${mod_name}"
 displayURL="${mod_url}"
 logoFile="${mod_id}.png"
+# NeoForge 26.2 reads bannerFile first and falls back to logoFile (older builds); the same picture either way.
+bannerFile="${mod_id}.png"
 logoBlur=false
 authors="${mod_authors}"
 credits="Placement maths inspired by AutoSlabs (Andrew6rant) and half-breaking by KleeSlabs (BlayTheNinth)."
