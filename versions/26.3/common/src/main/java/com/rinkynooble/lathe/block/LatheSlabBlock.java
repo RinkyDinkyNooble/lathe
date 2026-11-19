@@ -74,6 +74,12 @@ public class LatheSlabBlock extends SlabBlock implements ShapeBlock {
         return half != null ? half : ShapeBlock.breakWhole(this, state, level, pos, player, fluid);
     }
 
+    // NeoForge 21.11 calls this (no @Override: only NeoForge has it). Its game modes call playerWillDestroy first.
+    public boolean onDestroyedByPlayer(BlockState state, Level level, BlockPos pos, Player player, ItemStack tool, boolean willHarvest, FluidState fluid) {
+        BlockState rest = ShapeBlock.remainingHalf(this, state, pos, player);
+        return level.setBlock(pos, rest != null ? rest : fluid.createLegacyBlock(), level.isClientSide() ? 11 : 3);
+    }
+
     @Override
     public void playerDestroy(ServerLevel level, ServerPlayer player, BlockPos pos, BlockState state, @Nullable BlockEntity blockEntity, ItemStack tool) {
         // 26.3: called with the server level and player.
