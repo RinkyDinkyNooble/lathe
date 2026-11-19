@@ -55,6 +55,13 @@ final class NeoForgePlatform implements Platform {
         return TOOL_TAGS;
     }
 
+    @Override
+    public boolean gameModeCallsPlayerWillDestroy() {
+        // NeoForge's ServerPlayerGameMode and MultiPlayerGameMode call it before onDestroyedByPlayer
+        // (its default onDestroyedByPlayer doesn't), unlike Forge 1.20.1's hook.
+        return true;
+    }
+
     private record NeoForgeModFiles(IModFile file, Set<String> modIds) implements ModFiles {
         NeoForgeModFiles(IModFileInfo info) {
             this(info.getFile(), ids(info));
