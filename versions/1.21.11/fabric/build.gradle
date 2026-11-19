@@ -87,8 +87,8 @@ dependencies {
     modLocalRuntime "maven.modrinth:${lostcities_fabric_project}:${lostcities_fabric_version}"
     modLocalRuntime "maven.modrinth:forge-config-api-port:${forge_config_api_port_version}"
     // Forge Config API Port ships Night Config inside its jar, but the dev run doesn't load nested libraries.
-    localRuntime "com.electronwill.night-config:core:3.8.0"
-    localRuntime "com.electronwill.night-config:toml:3.8.0"
+    localRuntime "com.electronwill.night-config:core:3.8.3"
+    localRuntime "com.electronwill.night-config:toml:3.8.3"
     modVerifyCompileOnly "maven.modrinth:${lostcities_fabric_project}:${lostcities_fabric_version}"
     if (project.hasProperty('withRenderers')) {
         modLocalRuntime "maven.modrinth:sodium:${sodium_version}"
