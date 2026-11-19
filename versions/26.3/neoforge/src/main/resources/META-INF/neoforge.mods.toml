@@ -1,0 +1,34 @@
+license="${mod_license}"
+issueTrackerURL="${mod_issues}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+displayURL="${mod_url}"
+logoFile="${mod_id}.png"
+# NeoForge reads bannerFile first and falls back to logoFile (older builds); the same picture either way.
+bannerFile="${mod_id}.png"
+logoBlur=false
+authors="${mod_authors}"
+credits="Placement maths inspired by AutoSlabs (Andrew6rant) and half-breaking by KleeSlabs (BlayTheNinth)."
+# The shapes are registry entries, so the client and the server need the same version and the same rules.
+description='''${mod_description}'''
+
+[[dependencies.${mod_id}]]
+    modId="neoforge"
+    type="required"
+    versionRange="${neoforge_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    type="required"
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+# Lathe's rules check runs before NeoForge's registry sync (see RulesCheck).
+[[mixins]]
+    config="lathe.mixins.json"
