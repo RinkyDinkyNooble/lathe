@@ -6,7 +6,6 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.configuration.ServerConfigurationPacketListener;
 import net.minecraft.resources.Identifier;
@@ -49,7 +48,9 @@ public final class RulesCheck {
 
     private static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
         // Optional: a client without Lathe gets past NeoForge's channel check, so the task can tell it what's missing.
-        event.registrar("1").optional().configurationBidirectional(PAYLOAD, Hash.CODEC, RulesCheck::onHash);
+        // NeoForge (21.11 and 26.1) wants the client's handler named too (or registered from a client-only event); a client
+        // without one for a clientbound payload refuses to start.
+        event.registrar("1").optional().configurationBidirectional(PAYLOAD, Hash.CODEC, RulesCheck::onServerHash, RulesCheck::onClientHash);
     }
 
     /** Queues the check for a joining player, ahead of NeoForge's registry sync. Called by the mixin. */
@@ -59,12 +60,12 @@ public final class RulesCheck {
         tasks.accept(new Task(listener));
     }
 
-    private static void onHash(Hash payload, IPayloadContext context) {
-        if (context.flow() == PacketFlow.CLIENTBOUND) {
-            // The client: answer with our own hash.
-            context.reply(new Hash(Lathe.rules.hash));
-            return;
-        }
+    /** The client: answer with our own hash. */
+    private static void onClientHash(Hash payload, IPayloadContext context) {
+        context.reply(new Hash(Lathe.rules.hash));
+    }
+
+    private static void onServerHash(Hash payload, IPayloadContext context) {
         String ours = Lathe.rules.hash;
         String theirs = payload.hash();
         if (theirs.equals(ours)) {
