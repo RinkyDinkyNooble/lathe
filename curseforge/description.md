@@ -10,7 +10,7 @@ Lathe makes **slabs, vertical slabs, stairs, vertical stairs, corners, quarters 
   <tr><th align="left">What</th><th align="left">Version</th></tr>
   <tr><td><strong>Forge</strong></td><td>47.4.10 or later, or any Forge from 51 on</td></tr>
   <tr><td><strong>NeoForge</strong></td><td>21.0.143 or later (on 21.11, 21.11.42 or later)</td></tr>
-  <tr><td><strong>Fabric</strong></td><td>Loader 0.15 or later, with <a href="https://www.curseforge.com/minecraft/mc-mods/fabric-api">Fabric API</a></td></tr>
+  <tr><td><strong>Fabric</strong></td><td>Loader 0.15 or later (newer files need a newer Loader), with <a href="https://www.curseforge.com/minecraft/mc-mods/fabric-api">Fabric API</a></td></tr>
   <tr><td><strong>Quilt</strong></td><td>With Quilted Fabric API, on the files marked Quilt</td></tr>
   <tr><td><strong>Sides</strong></td><td><span style="color:#e03e2d"><strong>Client and server</strong></span>, with the same rules files</td></tr>
 </table>
