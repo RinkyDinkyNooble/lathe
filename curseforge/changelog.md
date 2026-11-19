@@ -1,3 +1,21 @@
+## 0.3.0 for Minecraft 1.21 to 26.3 (2026-11-19)
+
+Lathe 0.3.0 for Fabric, NeoForge and Forge on Minecraft 1.21 and 1.21.1, 1.21.11, 26.1 to 26.1.2, 26.2 and 26.3: one file per loader and version. On 1.21 and 1.21.1 the Fabric file also runs on Quilt, with Quilted Fabric API (an alpha for those versions).
+
+- The same as 0.3.0 on Forge and Fabric 1.20.1: the same shapes, placing, recipes, drops and tags, and the same rules files, ids and block states, so rules and Lost Cities palettes carry over.
+- Fabric needs Fabric API. Needed on the client and the server, with the same rules.
+- On Forge 1.21 and later, a client with different rules is told so with both rules hashes, as on Fabric and NeoForge, and a client without Lathe is told the server uses Lathe.
+- Works with The Lost Cities where it exists: on NeoForge, and on Fabric with McJty's own builds (26.2 and later) or sunshainy's Fabric port (1.21.1 and 1.21.11). With that port on 1.21.1, stairs don't turn with rotated buildings (vanilla's either): the port's own tag file is in a folder 1.21 no longer reads.
+
+Fixed while porting (none of these were in a released file):
+
+- Fixed: NeoForge clients with Lathe couldn't start on 1.21.11 and 26.x.
+- Fixed: on NeoForge, breaking a Lathe slab or vertical slab played its sound and particles twice.
+- Fixed: on 26.x, the game crashed at startup with Sodium.
+- Fixed: on Forge 1.21.11, the items of stained and tinted glass shapes were drawn solid.
+- Fixed: on 26.3, the placing and half-breaking outlines were solid black and thicker than vanilla's.
+- Fixed: on Forge 26.3, Lathe's generated packs showed in the pack screens.
+
 ## 0.3.0 for Fabric (2026-11-15)
 
 First Fabric version, for Minecraft 1.20 and 1.20.1 with Fabric API. It also runs on Quilt with Quilted Fabric API.
