@@ -17,10 +17,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.block.model.BlockModelPart;
+import net.minecraft.client.renderer.block.model.BlockStateModel;
+import net.minecraft.client.renderer.item.ItemModel;
 import net.minecraft.client.resources.language.I18n;
-import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -28,7 +31,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -103,7 +106,7 @@ public final class VerifyClient {
             if (child instanceof net.minecraft.client.gui.components.Button button
                     && button.getMessage().getString().equals(net.minecraft.network.chat.CommonComponents.GUI_PROCEED.getString())) {
                 Lathe.LOG.info("[verify] pressing Proceed on the experimental settings warning");
-                button.onPress();
+                button.onPress(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN, 0, 0));
                 return;
             }
         }
@@ -145,16 +148,17 @@ public final class VerifyClient {
     private static void checkModels() {
         Minecraft mc = Minecraft.getInstance();
         BlockRenderDispatcher blocks = mc.getBlockRenderer();
-        BakedModel missing = mc.getModelManager().getMissingModel();
+        BlockStateModel missing = mc.getModelManager().getMissingBlockStateModel();
+        ItemModel missingItem = mc.getModelManager().getItemModel(Identifier.fromNamespaceAndPath(Lathe.MOD_ID, "no_such_item_model"));
         RandomSource random = RandomSource.create(42);
         for (Material material : Registration.MATERIALS.values()) {
             BlockState sourceState = material.source.defaultBlockState();
-            BakedModel sourceModel = blocks.getBlockModel(sourceState);
+            BlockStateModel sourceModel = blocks.getBlockModel(sourceState);
             for (Shape shape : material.shapes) {
                 Block block = material.block(shape);
                 String name = material.sourceId + " " + shape.word;
                 for (BlockState state : block.getStateDefinition().getPossibleStates()) {
-                    BakedModel model = blocks.getBlockModel(state);
+                    BlockStateModel model = blocks.getBlockModel(state);
                     REPORT.check(model != missing, name + " " + state + ": has a model");
                     if (model == missing) continue;
                     // Every face shows the texture the source shows on that side.
@@ -162,16 +166,16 @@ public final class VerifyClient {
                     for (Direction cull : allDirections()) {
                         for (BakedQuad quad : VerifyClientPlatform.get().quads(model, state, cull, random)) {
                             quads++;
-                            List<BakedQuad> sourceQuads = VerifyClientPlatform.get().quads(sourceModel, sourceState, quad.getDirection(), random);
+                            List<BakedQuad> sourceQuads = VerifyClientPlatform.get().quads(sourceModel, sourceState, quad.direction(), random);
                             if (sourceQuads.isEmpty()) continue;
                             BakedQuad expected = sourceQuads.get(0);
-                            REPORT.check(quad.getSprite() == expected.getSprite(), name + " " + state + " " + quad.getDirection() + ": texture " + quad.getSprite().contents().name() + " vs " + expected.getSprite().contents().name());
-                            REPORT.check(quad.isShade() == expected.isShade(), name + " " + state + " " + quad.getDirection() + ": shading like the source");
-                            REPORT.check(quad.getTintIndex() == expected.getTintIndex(), name + " " + state + " " + quad.getDirection() + ": tint like the source");
+                            REPORT.check(quad.sprite() == expected.sprite(), name + " " + state + " " + quad.direction() + ": texture " + quad.sprite().contents().name() + " vs " + expected.sprite().contents().name());
+                            REPORT.check(quad.shade() == expected.shade(), name + " " + state + " " + quad.direction() + ": shading like the source");
+                            REPORT.check(quad.tintIndex() == expected.tintIndex(), name + " " + state + " " + quad.direction() + ": tint like the source");
                         }
                     }
                     REPORT.check(quads > 0, name + " " + state + ": has faces");
-                    REPORT.check(model.useAmbientOcclusion() == sourceModel.useAmbientOcclusion(), name + " " + state + ": ambient occlusion like the source");
+                    REPORT.check(ambientOcclusion(model, random) == ambientOcclusion(sourceModel, random), name + " " + state + ": ambient occlusion like the source");
                     String ours = VerifyClientPlatform.get().renderLayers(model, state, random);
                     String theirs = VerifyClientPlatform.get().renderLayers(sourceModel, sourceState, random);
                     REPORT.check(ours.equals(theirs), name + " " + state + ": render layer " + ours + " vs " + theirs);
@@ -179,8 +183,10 @@ public final class VerifyClient {
                 Item item = material.items.get(shape);
                 if (item != null) {
                     ItemStack stack = new ItemStack(item);
-                    BakedModel itemModel = mc.getItemRenderer().getModel(stack, null, null, 0);
-                    REPORT.check(itemModel != missing && itemModel != mc.getItemRenderer().getItemModelShaper().getModelManager().getMissingModel(), name + ": item has a model");
+                    // Since 1.21.4 an item's model comes from its item model definition (assets/<ns>/items/).
+                    Identifier itemModelId = stack.get(DataComponents.ITEM_MODEL);
+                    ItemModel itemModel = itemModelId == null ? missingItem : mc.getModelManager().getItemModel(itemModelId);
+                    REPORT.check(itemModel != missingItem, name + ": item has a model");
                     String expected = I18n.get(material.source.getDescriptionId()) + " " + shape.englishName;
                     String got = stack.getHoverName().getString();
                     REPORT.check(got.equals(expected), name + ": item name '" + got + "' (expected '" + expected + "')");
@@ -190,6 +196,12 @@ public final class VerifyClient {
         }
         checkGlassFaces();
         REPORT.info(VerifyClientPlatform.get().renderers());
+    }
+
+    /** Whether a model is drawn with ambient occlusion (since 1.21.5 each part of a model says so; these have one). */
+    private static boolean ambientOcclusion(BlockStateModel model, RandomSource random) {
+        List<BlockModelPart> parts = model.collectParts(random);
+        return !parts.isEmpty() && parts.get(0).useAmbientOcclusion();
     }
 
     /** Faces between see-through shapes, and between them and their glass, are hidden as between two glass blocks. */
@@ -251,8 +263,8 @@ public final class VerifyClient {
     private static void buildGallery() {
         ServerLevel level = server().overworld();
         server().execute(() -> {
-            level.getGameRules().getRule(GameRules.RULE_DAYLIGHT).set(false, server());
-            level.getGameRules().getRule(GameRules.RULE_WEATHER_CYCLE).set(false, server());
+            level.getGameRules().set(GameRules.ADVANCE_TIME, false, server());
+            level.getGameRules().set(GameRules.ADVANCE_WEATHER, false, server());
             level.setDayTime(6000);
             level.setWeatherParameters(6000, 0, false, false);
             for (int row = 0; row < gallery().size(); row++) {
@@ -413,13 +425,13 @@ public final class VerifyClient {
         Vec3 d = target.subtract(eye);
         float yaw = (float) (Math.toDegrees(Math.atan2(d.z, d.x)) - 90.0);
         float pitch = (float) -Math.toDegrees(Math.atan2(d.y, Math.sqrt(d.x * d.x + d.z * d.z)));
-        mc.player.getInventory().selected = 0;
+        mc.player.getInventory().setSelectedSlot(0);
         server().execute(() -> {
             ServerPlayer player = server().getPlayerList().getPlayers().get(0);
             player.setGameMode(GameType.CREATIVE);
             player.getAbilities().flying = false;
             player.onUpdateAbilities();
-            player.teleportTo(server().overworld(), feet.x, feet.y, feet.z, yaw, pitch);
+            player.teleportTo(server().overworld(), feet.x, feet.y, feet.z, Set.of(), yaw, pitch, true);
             player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(lablink().items.get(Shape.CORNER), 16));
         });
     }
@@ -516,14 +528,14 @@ public final class VerifyClient {
             player.setGameMode(hideGui ? GameType.SPECTATOR : GameType.CREATIVE);
             player.getAbilities().flying = true;
             player.onUpdateAbilities();
-            player.teleportTo(server().overworld(), eye.x, eye.y - player.getEyeHeight(), eye.z, yaw, pitch);
+            player.teleportTo(server().overworld(), eye.x, eye.y - player.getEyeHeight(), eye.z, Set.of(), yaw, pitch, true);
         });
     }
 
     static void screenshot(String name) {
         Minecraft mc = Minecraft.getInstance();
         Consumer<net.minecraft.network.chat.Component> log = message -> Lathe.LOG.info("[verify] {}", message.getString());
-        Screenshot.grab(mc.gameDirectory, name, mc.getMainRenderTarget(), log);
+        Screenshot.grab(mc.gameDirectory, name, mc.getMainRenderTarget(), 1, log);
         REPORT.info("screenshot " + Path.of(mc.gameDirectory.getPath(), "screenshots", name));
     }
 
@@ -537,7 +549,7 @@ public final class VerifyClient {
         BlockPos base = placeBase();
         Vec3 target = new Vec3(base.getX() + 0.5, base.getY() + 1.0, base.getZ() + 0.12);
         look(new Vec3(base.getX() + 0.5, base.getY() + 3.0, base.getZ() + 2.2), target, false);
-        mc.player.getInventory().selected = 0;
+        mc.player.getInventory().setSelectedSlot(0);
         server().execute(() -> server().getPlayerList().getPlayers().get(0).setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(lablink().items.get(Shape.SLAB), 16)));
     }
 

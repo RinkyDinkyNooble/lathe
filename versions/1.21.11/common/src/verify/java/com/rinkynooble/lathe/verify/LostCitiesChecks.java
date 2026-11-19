@@ -84,7 +84,7 @@ public final class LostCitiesChecks implements VerifyPlatform.LostCities {
         long start = System.currentTimeMillis();
         for (int[] c : chunks) {
             LevelChunk chunk = city.getChunk(c[0], c[1]);
-            int minY = city.getMinBuildHeight(), maxY = city.getMaxBuildHeight();
+            int minY = city.getMinY(), maxY = city.getMaxY() + 1; // getMaxY is the top block itself
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {

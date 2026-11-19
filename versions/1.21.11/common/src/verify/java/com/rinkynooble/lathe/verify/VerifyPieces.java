@@ -336,7 +336,7 @@ final class VerifyPieces {
         Vec3 hit = new Vec3(gap.getX() + 0.5 + offset.x, clicked.getY() + 1, gap.getZ() + 0.5 + offset.z);
         // Standing to the south (turned with the scene), looking the same way, for vertical stairs' aim.
         Vec3 feet = Vec3.atBottomCenterOf(gap).add(rotate(new Vec3(0, 0, 4), rotation));
-        player.moveTo(feet.x, feet.y, feet.z, 180.0F + rotation.ordinal() * 90.0F, 30.0F);
+        player.snapTo(feet.x, feet.y, feet.z, 180.0F + rotation.ordinal() * 90.0F, 30.0F);
         player.setShiftKeyDown(sneaking);
         VerifyServer.use(player, new ItemStack(item, 4), clicked, Direction.UP, hit);
         player.setShiftKeyDown(false);
@@ -359,7 +359,7 @@ final class VerifyPieces {
         Material material = lablink();
         if (material == null || !material.has(Shape.QUARTER) || !material.has(Shape.EIGHTH)) return;
         ServerPlayer player = VerifyServer.survivalPlayer(level);
-        player.moveTo(0.5, 100, 0.5, 0.0F, 0.0F);
+        player.snapTo(0.5, 100, 0.5, 0.0F, 0.0F);
         LatheQuarterBlock quarter = (LatheQuarterBlock) material.block(Shape.QUARTER);
         LatheEighthBlock eighth = (LatheEighthBlock) material.block(Shape.EIGHTH);
         Item quarterItem = material.items.get(Shape.QUARTER), eighthItem = material.items.get(Shape.EIGHTH);

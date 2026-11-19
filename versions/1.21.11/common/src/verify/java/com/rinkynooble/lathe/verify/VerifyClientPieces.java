@@ -234,7 +234,7 @@ final class VerifyClientPieces {
         Minecraft mc = Minecraft.getInstance();
         Vec3 target = new Vec3(pos.getX() + x, pos.getY(), pos.getZ() + z);
         look(target.add(0.001, 4.0, 0.0), target, false);
-        mc.player.getInventory().selected = 0;
+        mc.player.getInventory().setSelectedSlot(0);
         Item item = lablink().items.get(shape);
         server().execute(() -> server().getPlayerList().getPlayers().get(0).setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(item, 16)));
     }

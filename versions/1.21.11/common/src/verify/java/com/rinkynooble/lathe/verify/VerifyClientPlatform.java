@@ -1,7 +1,7 @@
 package com.rinkynooble.lathe.verify;
 
 import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.client.renderer.block.model.BlockStateModel;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
@@ -27,10 +27,10 @@ public interface VerifyClientPlatform {
     }
 
     /** A model's quads on one side ({@code null}: not culled), as the renderer reads them. */
-    List<BakedQuad> quads(BakedModel model, BlockState state, @Nullable Direction side, RandomSource random);
+    List<BakedQuad> quads(BlockStateModel model, BlockState state, @Nullable Direction side, RandomSource random);
 
     /** The render layers a state is drawn in, as text to compare. */
-    String renderLayers(BakedModel model, BlockState state, RandomSource random);
+    String renderLayers(BlockStateModel model, BlockState state, RandomSource random);
 
     /** Which renderer mods are loaded, for the report. */
     String renderers();

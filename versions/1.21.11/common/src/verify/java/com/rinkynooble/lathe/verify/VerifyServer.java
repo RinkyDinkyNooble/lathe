@@ -22,8 +22,10 @@ import com.rinkynooble.lathe.pack.ModResources;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -38,6 +40,11 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.item.crafting.CraftingInput;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.ShapedRecipe;
+import net.minecraft.world.item.crafting.SingleItemRecipe;
+import net.minecraft.world.item.crafting.SingleRecipeInput;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -272,10 +279,13 @@ public final class VerifyServer {
         if (!material.items.containsKey(shape)) return;
         String name = material.sourceId + " " + shape.word;
         Identifier id = material.id(shape);
-        var cut = level.getRecipeManager().byKey(Identifier.fromNamespaceAndPath("lathe", id.getPath() + "_from_stonecutting"));
+        var cut = level.recipeAccess().byKey(recipeKey(id.getPath() + "_from_stonecutting"));
         report.check(cut.isPresent(), name + ": stonecutter recipe loaded");
-        cut.ifPresent(recipe -> {
-            ItemStack result = recipe.value().getResultItem(level.registryAccess());
+        cut.ifPresent(holder -> {
+            // Since 1.21.2 a recipe gives its result by assembling it.
+            SingleItemRecipe recipe = holder.value() instanceof SingleItemRecipe single ? single : null;
+            ItemStack result = recipe == null ? ItemStack.EMPTY
+                    : recipe.assemble(new SingleRecipeInput(new ItemStack(material.source)), level.registryAccess());
             int count = switch (shape) {
                 case SLAB, VSLAB -> 2;
                 case QUARTER -> 4;
@@ -283,13 +293,21 @@ public final class VerifyServer {
                 default -> 1;
             };
             report.check(result.is(material.items.get(shape)) && result.getCount() == count, name + ": stonecutter makes " + count + " (got " + result + ")");
-            report.check(recipe.value().getIngredients().get(0).test(new ItemStack(material.source)), name + ": stonecutter takes the source");
+            report.check(recipe != null && recipe.input().test(new ItemStack(material.source)), name + ": stonecutter takes the source");
         });
         if (shape == Shape.SLAB || shape == Shape.VSLAB) {
-            var back = level.getRecipeManager().byKey(Identifier.fromNamespaceAndPath("lathe", material.baseName() + "_from_" + shape.word));
+            var back = level.recipeAccess().byKey(recipeKey(material.baseName() + "_from_" + shape.word));
             report.check(back.isPresent(), name + ": two slabs craft back into the source");
-            back.ifPresent(recipe -> report.check(recipe.value().getResultItem(level.registryAccess()).is(material.source.asItem()), name + ": back recipe makes the source"));
+            back.ifPresent(holder -> {
+                ItemStack made = holder.value() instanceof ShapedRecipe shaped
+                        ? shaped.assemble(CraftingInput.EMPTY, level.registryAccess()) : ItemStack.EMPTY;
+                report.check(made.is(material.source.asItem()), name + ": back recipe makes the source");
+            });
         }
+    }
+
+    private static ResourceKey<Recipe<?>> recipeKey(String path) {
+        return ResourceKey.create(Registries.RECIPE, Identifier.fromNamespaceAndPath("lathe", path));
     }
 
     // ---- Placement and breaking ----
@@ -496,7 +514,7 @@ public final class VerifyServer {
                 // Click the wall's face in the gap, in the middle (the neighbours decide, not the aim).
                 Direction face = rotation.rotate(Direction.SOUTH);
                 BlockPos wall = gap.relative(face.getOpposite());
-                Vec3 hit = Vec3.atCenterOf(gap).add(Vec3.atLowerCornerOf(face.getOpposite().getNormal()).scale(0.5));
+                Vec3 hit = Vec3.atCenterOf(gap).add(Vec3.atLowerCornerOf(face.getOpposite().getUnitVec3i()).scale(0.5));
                 player.setShiftKeyDown(scene.sneaking);
                 use(player, new ItemStack(item, 4), wall, face, hit);
                 player.setShiftKeyDown(false);
@@ -627,7 +645,7 @@ public final class VerifyServer {
         // Vertical stairs: looking north, aiming right of centre, leaves the south-east quarter open.
         Item vstairs = both.items.get(Shape.VSTAIRS);
         reset(level, base);
-        player.moveTo(base.getX() + 0.5, base.getY() + 1, base.getZ() + 3.5, 180.0F, 30.0F); // yaw 180 looks north
+        player.snapTo(base.getX() + 0.5, base.getY() + 1, base.getZ() + 3.5, 180.0F, 30.0F); // yaw 180 looks north
         use(player, new ItemStack(vstairs, 4), base, Direction.UP, new Vec3(base.getX() + 0.8, base.getY() + 1, base.getZ() + 0.5));
         placed = level.getBlockState(base.above());
         report.check(placed.is(both.block(Shape.VSTAIRS)) && placed.getValue(LatheVerticalStairBlock.FACING) == Direction.EAST,
@@ -637,7 +655,7 @@ public final class VerifyServer {
 
     /** Near spawn, where chunks stay loaded with their entities, so drops can be counted. */
     static BlockPos testSite(ServerLevel level) {
-        BlockPos spawn = level.getSharedSpawnPos();
+        BlockPos spawn = level.getRespawnData().pos();
         return new BlockPos(spawn.getX() + 4, 100, spawn.getZ() + 4);
     }
 
@@ -694,7 +712,7 @@ public final class VerifyServer {
         reset(level, pos.below());
         level.setBlock(pos.below(), Blocks.AIR.defaultBlockState(), 3);
         level.setBlock(pos, state, 3);
-        player.moveTo(feet.x, feet.y, feet.z, yaw, pitch);
+        player.snapTo(feet.x, feet.y, feet.z, yaw, pitch);
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.DIAMOND_PICKAXE));
         player.gameMode.destroyBlock(pos);
     }

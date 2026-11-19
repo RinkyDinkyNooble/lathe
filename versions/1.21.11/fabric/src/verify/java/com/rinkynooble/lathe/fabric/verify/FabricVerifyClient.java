@@ -13,7 +13,8 @@ import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.client.renderer.block.model.BlockModelPart;
+import net.minecraft.client.renderer.block.model.BlockStateModel;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
@@ -22,6 +23,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -67,13 +69,16 @@ public final class FabricVerifyClient implements ClientModInitializer, VerifyCli
     }
 
     @Override
-    public List<BakedQuad> quads(BakedModel model, BlockState state, Direction side, RandomSource random) {
-        return model.getQuads(state, side, random);
+    public List<BakedQuad> quads(BlockStateModel model, BlockState state, Direction side, RandomSource random) {
+        // Since 1.21.5 a block model is made of parts, each with its own quads.
+        List<BakedQuad> quads = new ArrayList<>();
+        for (BlockModelPart part : model.collectParts(random)) quads.addAll(part.getQuads(side));
+        return quads;
     }
 
     /** On Fabric a block's layer is set in code (glass is translucent there, not in its model). */
     @Override
-    public String renderLayers(BakedModel model, BlockState state, RandomSource random) {
+    public String renderLayers(BlockStateModel model, BlockState state, RandomSource random) {
         return ItemBlockRenderTypes.getChunkRenderType(state).toString();
     }
 
