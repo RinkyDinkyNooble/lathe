@@ -64,6 +64,8 @@ public final class VerifyClient {
     private static int tick;
     private static int stepIndex;
     private static int waitUntil;
+    /** The experimental settings warning whose button was pressed (26.2 keeps it open for a few ticks after). */
+    private static Object pressedWarning;
     static final BlockPos ORIGIN = new BlockPos(0, 100, 0);
     /** The gallery's rows: the test rules' blocks of each kind. */
     static List<Identifier> gallery() {
@@ -112,10 +114,14 @@ public final class VerifyClient {
             return;
         }
         if (!screen.getTitle().getString().contains("Experimental")) return;
+        // Press once per screen: 26.2 leaves the screen up for a few ticks after the press, and pressing again
+        // opens the world again (the first open's session lock is then lost and the integrated server crashes).
+        if (screen == pressedWarning) return;
         for (var child : screen.children()) {
             if (child instanceof net.minecraft.client.gui.components.Button button
                     && button.getMessage().getString().equals(proceed)) {
                 Lathe.LOG.info("[verify] pressing '{}' on the experimental settings warning", proceed);
+                pressedWarning = screen;
                 button.onPress(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN, 0, 0));
                 return;
             }
