@@ -1,0 +1,9 @@
+{
+  "pack": {
+    "description": {
+      "text": "Lathe resources"
+    },
+    "min_format": [107, 1],
+    "max_format": 107
+  }
+}
