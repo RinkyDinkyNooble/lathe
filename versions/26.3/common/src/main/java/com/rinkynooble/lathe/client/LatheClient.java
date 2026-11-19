@@ -11,6 +11,7 @@ import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.color.block.BlockTintSource;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.block.BlockAndTintGetter;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -160,19 +161,24 @@ public final class LatheClient {
     }
 
     /**
-     * Draws a shape's edges as the game draws its block outline (colour, width, high contrast). 26.2: submitted to the
-     * frame's node collector, as vanilla's own outline.
+     * Draws a shape's edges as the game draws its block outline (colour, width, render type, high contrast). 26.2:
+     * submitted to the frame's node collector, as vanilla's own outline. 26.3: vanilla's outline no longer uses
+     * {@code lines()} (which now draws the 40% black as solid black) but a translucent lines type, picked as below.
      */
     private static void renderShape(PoseStack poseStack, SubmitNodeCollector collector, VoxelShape shape, BlockPos pos, Vec3 camera,
                                     boolean highContrast, boolean afterTranslucent) {
+        Minecraft minecraft = Minecraft.getInstance();
         poseStack.pushPose();
         poseStack.translate(pos.getX() - camera.x, pos.getY() - camera.y, pos.getZ() - camera.z);
         if (highContrast) {
             collector.submitShapeOutline(poseStack, shape, RenderTypes.secondaryBlockOutline(), ARGB.black(255), 7.0F, afterTranslucent);
         }
         int color = highContrast ? -11010079 : ARGB.black(102);
-        float width = Minecraft.getInstance().gameRenderer.gameRenderState().windowRenderState.appropriateLineWidth;
-        collector.submitShapeOutline(poseStack, shape, RenderTypes.lines(), color, width, afterTranslucent);
+        RenderType type = highContrast ? RenderTypes.linesDepthBias()
+                : minecraft.gameRenderer.useImprovedTransparency() ? RenderTypes.linesTranslucentNoDepthWrite()
+                : RenderTypes.linesTranslucent();
+        float width = minecraft.gameRenderer.gameRenderState().windowRenderState.appropriateLineWidth;
+        collector.submitShapeOutline(poseStack, shape, type, color, width, afterTranslucent);
         poseStack.popPose();
     }
 }
