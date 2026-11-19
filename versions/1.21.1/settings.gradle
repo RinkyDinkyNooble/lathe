@@ -1,0 +1,21 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven { url = 'https://maven.fabricmc.net/' }
+        maven { url = 'https://maven.neoforged.net/releases' }
+        maven { url = 'https://maven.minecraftforge.net/' }
+    }
+}
+
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+}
+
+rootProject.name = 'lathe-1.21.1'
+
+// Lathe for Minecraft 1.21 and 1.21.1. Shared code lives in common/ (not a project of its own): each loader folder
+// compiles it into its own jar. A loader folder joins the build once it has a build.gradle, unless it's a build of
+// its own (its own settings.gradle, for a loader plugin that needs another Gradle version).
+['fabric', 'neoforge', 'forge'].each { loader ->
+    if (file("${loader}/build.gradle").exists() && !file("${loader}/settings.gradle").exists()) include loader
+}
