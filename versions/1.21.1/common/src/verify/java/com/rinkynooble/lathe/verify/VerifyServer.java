@@ -112,6 +112,17 @@ public final class VerifyServer {
 
     private static Map<ResourceLocation, byte[]> palettePackFiles() {
         Map<ResourceLocation, byte[]> files = new HashMap<>();
+        // The Lost Cities Fabric port for 1.21.1 still ships its block tags in data/lostcities/tags/blocks/, which
+        // 1.21 doesn't read, so its own lostcities:rotatable (#minecraft:stairs, #minecraft:doors) is empty there.
+        // Its own file, moved to the folder 1.21 reads, so the checks see the tag as Lost Cities means it.
+        if (ModResources.find("lostcities", "data/lostcities/tags/block/rotatable.json") == null) {
+            JsonElement rotatable = ModResources.readJson("lostcities", "data/lostcities/tags/blocks/rotatable.json");
+            if (rotatable != null) {
+                Lathe.LOG.info("[verify] Lost Cities' rotatable tag is in the pre-1.21 folder; the verify pack moves it");
+                files.put(ResourceLocation.fromNamespaceAndPath("lostcities", "tags/block/rotatable.json"),
+                        rotatable.toString().getBytes(StandardCharsets.UTF_8));
+            }
+        }
         JsonElement palette = ModResources.readJson("lostcities", "data/lostcities/lostcities/palettes/default.json");
         if (palette == null) return files;
         for (JsonElement entry : palette.getAsJsonObject().getAsJsonArray("palette")) {
