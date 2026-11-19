@@ -31,9 +31,14 @@ sourceSets {
         compileClasspath += sourceSets.main.output
         runtimeClasspath += sourceSets.main.output
     }
+    // Nothing of its own and no Lathe: runWithoutLatheClient is a plain Forge client, for the rules check's
+    // "client without Lathe" case (see README).
+    withoutLathe {
+    }
 }
 
 configurations {
+    withoutLatheImplementation.extendsFrom implementation
     verifyImplementation.extendsFrom implementation
     verifyRuntimeOnly.extendsFrom runtimeOnly
     verifyCompileOnly.extendsFrom compileOnly
@@ -72,6 +77,11 @@ minecraft {
                     systemProperty 'lathe.verify.world', 'lathe-test'
                     args '--width', '1280', '--height', '720'
                 }
+            }
+            with(sourceSets.withoutLathe) {
+                // Joins the dev server (runServer), which should refuse it with "This server uses Lathe...".
+                workingDir = layout.projectDirectory.dir('run-without-lathe')
+                args '--quickPlayMultiplayer', 'localhost:25565', '--width', '854', '--height', '480'
             }
         }
         register('server') {
