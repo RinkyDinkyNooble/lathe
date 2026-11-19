@@ -50,11 +50,11 @@ public final class ForgeVerify implements VerifyPlatform {
     private static final LostCities LOST_CITIES = new Missing();
     private final Map<ServerLevel, ServerPlayer> fakePlayers = new WeakHashMap<>();
 
-    public ForgeVerify(FMLJavaModLoadingContext context) {
+    public ForgeVerify() {
         if (FMLEnvironment.dist.isClient()) ForgeVerifyClient.init();
         if (!VerifyServer.ENABLED) return;
         VerifyServer.install(this);
-        context.getModEventBus().addListener(ForgeVerify::onAddPackFinders);
+        FMLJavaModLoadingContext.get().getModEventBus().addListener(ForgeVerify::onAddPackFinders);
         MinecraftForge.EVENT_BUS.addListener((ServerStartedEvent event) -> VerifyServer.onServerStarted(event.getServer()));
     }
 

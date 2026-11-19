@@ -19,14 +19,15 @@ import java.util.List;
 
 @Mod(Lathe.MOD_ID)
 public final class LatheForge {
-    public LatheForge(FMLJavaModLoadingContext context) {
-        IEventBus modBus = context.getModEventBus();
+    // No constructor parameters: Forge 51.0's first builds construct mods only through a no-argument constructor.
+    public LatheForge() {
+        IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         Lathe.init(new ForgePlatform());
         // The shapes are registry entries, so a client and a server with different rules can't play together.
         RulesCheck.register();
         Lathe.logRulesHash();
 
-        listenAfterEveryMod(modBus, context.getContainer());
+        listenAfterEveryMod(modBus, ModLoadingContext.get().getActiveContainer());
         modBus.addListener(LatheForge::onAddPackFinders);
         if (FMLEnvironment.dist.isClient()) ForgeClient.init(modBus);
     }
