@@ -67,8 +67,10 @@ minecraft {
                     args '--quickPlayMultiplayer', 'localhost:25565', '--width', '854', '--height', '480'
                 } else {
                     systemProperty 'lathe.verify', 'true'
-                    // Joins run/saves/lathe-test straight away (copied from the verify server's world; see README).
-                    args '--quickPlaySingleplayer', 'lathe-test', '--width', '1280', '--height', '720'
+                    // The checks open run/saves/lathe-test (copied from the verify server's world; see README) from
+                    // the title screen; not by quick play, which Forge 52 runs before its event bus starts.
+                    systemProperty 'lathe.verify.world', 'lathe-test'
+                    args '--width', '1280', '--height', '720'
                 }
             }
         }
