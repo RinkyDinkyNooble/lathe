@@ -11,11 +11,15 @@ import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
+import net.minecraft.client.resources.model.ModelBakery;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
 import java.io.IOException;
@@ -39,7 +43,7 @@ public final class NeoForgeVerifyClient implements VerifyClientPlatform {
     private NeoForgeVerifyClient() {
     }
 
-    static void init() {
+    static void init(IEventBus modBus) {
         if (JOIN) {
             NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post event) -> watchJoin(Minecraft.getInstance()));
             return;
@@ -47,6 +51,17 @@ public final class NeoForgeVerifyClient implements VerifyClientPlatform {
         if (!VerifyServer.ENABLED) return;
         VerifyClientPlatform.set(new NeoForgeVerifyClient());
         NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post event) -> VerifyClient.onClientTick());
+        modBus.addListener(NeoForgeVerifyClient::onModifyBakingResult);
+    }
+
+    /**
+     * The checks take the missing item model from an id nothing has ({@code lathe:no_such_item_model}). Vanilla
+     * returns it quietly; NeoForge's model manager also logs a warning, which the checks would count as Lathe's. So the
+     * probe's id is given that same missing model here: the checks get the same object, without the warning.
+     */
+    private static void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
+        ModelBakery.BakingResult result = event.getBakingResult();
+        result.itemStackModels().putIfAbsent(Identifier.fromNamespaceAndPath(Lathe.MOD_ID, "no_such_item_model"), result.missingModels().item());
     }
 
     private static void watchJoin(Minecraft client) {
