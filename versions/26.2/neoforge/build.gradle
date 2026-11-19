@@ -60,10 +60,16 @@ neoForge {
             gameDirectory = project.file('run')
             sourceSet = sourceSets.verify
             systemProperty 'lathe.verify', 'true'
-            // Sodium and Iris still use the deprecated `logoFile`, and NeoForge 26.2's dev runs stop on a warning
-            // screen for that. Their own metadata, not Lathe's: hidden for the renderer runs only, so the vanilla run
-            // still catches the warning for Lathe.
-            if (project.hasProperty('withRenderers')) systemProperty 'neoforge.warnings.logofile.hide', 'true'
+            // Renderer runs only (dev-only behaviour of other mods, not Lathe's):
+            if (project.hasProperty('withRenderers')) {
+                // Sodium and Iris still use the deprecated `logoFile`, and NeoForge 26.2's dev runs stop on a warning
+                // screen for that. The vanilla run still catches the warning for Lathe.
+                systemProperty 'neoforge.warnings.logofile.hide', 'true'
+                // Vanilla's dev-only draw validation (GlRenderPass.VALIDATION, on in NeoForge dev runs, off for
+                // players) reads 16 vertex format bindings from Iris's shader pipelines, which have fewer, and crashes
+                // on the first frame with a shader pack. Off, as a player has it (as the Blaze3D validation layer).
+                systemProperty 'neoforge.disableGlValidation', 'true'
+            }
             // Joins run/saves/lathe-test straight away (copied from the verify server's world; see README).
             programArguments.addAll '--quickPlaySingleplayer', 'lathe-test', '--width', '1280', '--height', '720'
         }
