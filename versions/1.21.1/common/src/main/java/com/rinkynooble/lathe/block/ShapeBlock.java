@@ -92,7 +92,7 @@ public interface ShapeBlock {
     static Boolean breakHalf(ShapeBlock block, BlockState state, Level level, BlockPos pos, Player player) {
         BlockState rest = remainingHalf(block, state, pos, player);
         if (rest == null) return null;
-        ((Block) block).playerWillDestroy(level, pos, state, player);
+        willDestroy((Block) block, state, level, pos, player);
         return level.setBlock(pos, rest, level.isClientSide ? 11 : 3);
     }
 
@@ -128,8 +128,13 @@ public interface ShapeBlock {
     }
 
     static boolean breakWhole(Block block, BlockState state, Level level, BlockPos pos, Player player, FluidState fluid) {
-        block.playerWillDestroy(level, pos, state, player);
+        willDestroy(block, state, level, pos, player);
         return level.setBlock(pos, fluid.createLegacyBlock(), level.isClientSide ? 11 : 3);
+    }
+
+    /** The break particles, sound and game event, unless the game mode already made them (NeoForge). */
+    private static void willDestroy(Block block, BlockState state, Level level, BlockPos pos, Player player) {
+        if (!Lathe.platform.gameModeCallsPlayerWillDestroy()) block.playerWillDestroy(level, pos, state, player);
     }
 
     Map<BlockState, Integer> MASKS = new ConcurrentHashMap<>();
