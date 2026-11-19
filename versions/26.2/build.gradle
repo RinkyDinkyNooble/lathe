@@ -1,0 +1,11 @@
+// The group's root project only holds shared settings. Code lives in common/ and the loader folders.
+
+subprojects {
+    group = mod_group_id
+    version = mod_version
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.release = 25
+    }
+}
