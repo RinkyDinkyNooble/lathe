@@ -60,6 +60,12 @@ neoForge {
             gameDirectory = project.file('run')
             sourceSet = sourceSets.verify
             systemProperty 'lathe.verify', 'true'
+            // Renderer runs only (dev-only behaviour, not Lathe's): vanilla's dev-only draw validation
+            // (GlRenderPass.VALIDATION, on in NeoForge dev runs, off for players) throws "Missing sampler Sampler1"
+            // on an entity draw with Iris running a shader pack. Off, as a player has it (as the Blaze3D validation layer).
+            if (project.hasProperty('withRenderers')) {
+                systemProperty 'neoforge.disableGlValidation', 'true'
+            }
             // Joins run/saves/lathe-test straight away (copied from the verify server's world; see README).
             programArguments.addAll '--quickPlaySingleplayer', 'lathe-test', '--width', '1280', '--height', '720'
         }
