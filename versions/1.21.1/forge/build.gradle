@@ -51,22 +51,14 @@ minecraft {
     // ForgeGradle makes each run for every source set: runClient and runServer load Lathe alone; runVerifyClient
     // and runVerifyServer load the checks too (latheverify, from the verify source set).
     runs {
+        // Forge 52 finds the dev mods on the run's classpath, one per folder (each source set's output is one folder,
+        // see merge-source-sets in gradle.properties), so the runs need no mods {} lists.
         configureEach {
             systemProperty 'forge.logging.console.level', 'info'
-            mods {
-                "${mod_id}" {
-                    source sourceSets.main
-                }
-            }
         }
         register('client') {
             workingDir = layout.projectDirectory.dir('run')
             with(sourceSets.verify) {
-                mods {
-                    latheverify {
-                        source sourceSets.verify
-                    }
-                }
                 if (project.hasProperty('join')) {
                     // runVerifyClient -Pjoin: joins the dev server (runServer) and records what happened, for the
                     // rules check (see README).
@@ -84,11 +76,6 @@ minecraft {
             workingDir = layout.projectDirectory.dir('run-server')
             args '--nogui'
             with(sourceSets.verify) {
-                mods {
-                    latheverify {
-                        source sourceSets.verify
-                    }
-                }
                 systemProperty 'lathe.verify', 'true'
             }
         }
