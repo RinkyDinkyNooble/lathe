@@ -91,10 +91,39 @@ repositories {
     }
 }
 
+// Sodium for NeoForge is a library jar (its early checks and workarounds) that adds the real mod from a nested jar
+// through its own mod locator. A dev run takes the wrapper itself for the mod and never loads the nested one, so the
+// client checks load the nested jars directly, plus the wrapper's classes without its mod metadata and locator.
+configurations {
+    sodiumWrapper { transitive = false }
+}
+var unpackSodium = tasks.register('unpackSodium', Sync) {
+    from { configurations.sodiumWrapper.collect { zipTree(it) } }
+    include 'META-INF/jarjar/*.jar'
+    eachFile { path = name }
+    includeEmptyDirs = false
+    into layout.buildDirectory.dir('sodium-jars')
+}
+var sodiumServiceJar = tasks.register('sodiumServiceJar', Jar) {
+    from { configurations.sodiumWrapper.collect { zipTree(it) } }
+    exclude 'META-INF/MANIFEST.MF', 'META-INF/neoforge.mods.toml', 'META-INF/jarjar/**',
+            'META-INF/services/net.neoforged.neoforgespi.locating.IModFileCandidateLocator'
+    manifest.attributes('FMLModType': 'LIBRARY', 'Automatic-Module-Name': 'sodium_service')
+    archiveFileName = 'sodium-service.jar'
+    destinationDirectory = layout.buildDirectory.dir('sodium-service')
+}
+
 dependencies {
     // Loaded in the dev runs only. Lathe doesn't depend on it.
     runtimeOnly "maven.modrinth:the-lost-cities:${lostcities_version}"
     verifyCompileOnly "maven.modrinth:the-lost-cities:${lostcities_version}"
+    // Sodium and Iris for the client checks with -PwithRenderers (dev runs only).
+    if (project.hasProperty('withRenderers')) {
+        sodiumWrapper "maven.modrinth:sodium:${project.findProperty('sodiumVersion') ?: sodium_version}"
+        runtimeOnly fileTree(unpackSodium.map { it.destinationDir }) { include '*.jar' }.builtBy(unpackSodium)
+        runtimeOnly files(sodiumServiceJar)
+        runtimeOnly "maven.modrinth:iris:${project.findProperty('irisVersion') ?: iris_version}"
+    }
 }
 
 var replaceProperties = [

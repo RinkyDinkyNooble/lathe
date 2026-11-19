@@ -1,21 +1,31 @@
 package com.rinkynooble.lathe.neoforge.verify;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.rinkynooble.lathe.Lathe;
 import com.rinkynooble.lathe.verify.VerifyClient;
 import com.rinkynooble.lathe.verify.VerifyClientPlatform;
 import com.rinkynooble.lathe.verify.VerifyServer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.BackupConfirmScreen;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
+import net.minecraft.client.gui.screens.GenericMessageScreen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
+import net.minecraft.client.resources.model.ModelBakery;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
 import java.io.IOException;
@@ -40,14 +50,45 @@ public final class NeoForgeVerifyClient implements VerifyClientPlatform {
     private NeoForgeVerifyClient() {
     }
 
-    static void init() {
+    static void init(IEventBus modBus) {
         if (JOIN) {
             NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post event) -> watchJoin(Minecraft.getInstance()));
             return;
         }
         if (!VerifyServer.ENABLED) return;
         VerifyClientPlatform.set(new NeoForgeVerifyClient());
+        NeoForge.EVENT_BUS.addListener((ClientTickEvent.Pre event) -> proceedPastExperimentalWarningOnce(Minecraft.getInstance()));
         NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post event) -> VerifyClient.onClientTick());
+        modBus.addListener(NeoForgeVerifyClient::onModifyBakingResult);
+    }
+
+    /**
+     * The world copy opens with the experimental settings warning (Lost Cities). Since 26.1 its "I know what I'm
+     * doing!" button loads the world asynchronously, so the warning stays up for a few ticks, and the checks' own
+     * handler (every tick) would press it again each time, opening the world twice ("Lock is no longer valid"). So it
+     * is pressed here, before that handler runs, exactly once, with a plain screen put up first until the world loads.
+     */
+    private static void proceedPastExperimentalWarningOnce(Minecraft mc) {
+        if (!(mc.screen instanceof BackupConfirmScreen screen) || !screen.getTitle().getString().contains("Experimental")) return;
+        String proceed = Component.translatable("selectWorld.backupJoinSkipButton").getString();
+        for (GuiEventListener child : screen.children()) {
+            if (child instanceof Button button && button.getMessage().getString().equals(proceed)) {
+                Lathe.LOG.info("[verify] pressing '{}' on the experimental settings warning", proceed);
+                mc.setScreen(new GenericMessageScreen(Component.literal("Loading the test world")));
+                button.onPress(new KeyEvent(InputConstants.KEY_RETURN, 0, 0));
+                return;
+            }
+        }
+    }
+
+    /**
+     * The checks take the missing item model from an id nothing has ({@code lathe:no_such_item_model}). Vanilla
+     * returns it quietly; NeoForge's model manager also logs a warning, which the checks would count as Lathe's. So the
+     * probe's id is given that same missing model here: the checks get the same object, without the warning.
+     */
+    private static void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
+        ModelBakery.BakingResult result = event.getBakingResult();
+        result.itemStackModels().putIfAbsent(Identifier.fromNamespaceAndPath(Lathe.MOD_ID, "no_such_item_model"), result.missingModels().item());
     }
 
     private static void watchJoin(Minecraft client) {
