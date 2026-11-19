@@ -1,5 +1,6 @@
 package com.rinkynooble.lathe.forge.verify;
 
+import com.rinkynooble.lathe.Lathe;
 import com.rinkynooble.lathe.verify.Report;
 import com.rinkynooble.lathe.verify.TestBlocks;
 import com.rinkynooble.lathe.verify.VerifyPlatform;
@@ -53,7 +54,16 @@ public final class ForgeVerify implements VerifyPlatform {
         if (!VerifyServer.ENABLED) return;
         VerifyServer.install(this);
         AddPackFindersEvent.BUS.addListener(ForgeVerify::onAddPackFinders);
-        ServerStartedEvent.BUS.addListener(event -> VerifyServer.onServerStarted(event.getServer()));
+        ServerStartedEvent.BUS.addListener(event -> {
+            logPackHidden(event.getServer());
+            VerifyServer.onServerStarted(event.getServer());
+        });
+    }
+
+    /** Forge 66 no longer hides a pack from its resources' isHidden, so LatheForge sets the flag itself: log that it holds. */
+    private static void logPackHidden(MinecraftServer server) {
+        var pack = server.getPackRepository().getPack(Lathe.MOD_ID + ":generated_data");
+        Lathe.LOG.info("[verify] pack {}:generated_data hidden: {}", Lathe.MOD_ID, pack == null ? "no such pack" : pack.isHidden());
     }
 
     private static Identifier mc(String path) {
