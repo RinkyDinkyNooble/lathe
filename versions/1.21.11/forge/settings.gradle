@@ -1,0 +1,11 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven { url = 'https://maven.minecraftforge.net/' }
+    }
+}
+
+// Lathe for Forge, Minecraft 1.21.11: a build of its own, since ForgeGradle 7 (what Forge 61's MDK uses)
+// needs Gradle 9.3 or newer and the group's build runs Gradle 9.2.1. It compiles ../common in, as the other loaders do,
+// and reads the group's shared mod info from ../gradle.properties.
+rootProject.name = 'lathe-forge-1.21.11'
