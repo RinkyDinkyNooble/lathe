@@ -1,0 +1,15 @@
+license="${mod_license}"
+
+[[mods]]
+modId="latheverify"
+version="${mod_version}"
+displayName="Lathe checks (dev only)"
+authors="${mod_authors}"
+description='''Lathe's dev-only checks. Never shipped. Runs only with -Dlathe.verify=true.'''
+
+[[dependencies.latheverify]]
+    modId="${mod_id}"
+    type="required"
+    versionRange="[${mod_version}]"
+    ordering="AFTER"
+    side="BOTH"
