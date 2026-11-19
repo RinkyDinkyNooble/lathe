@@ -30,6 +30,14 @@ public interface Platform {
     /** The tool tags copied from a source block to its shapes, so other mods see the same tool needs. */
     Pattern toolTags();
 
+    /**
+     * Whether the game modes call {@code playerWillDestroy} themselves before the loader's
+     * {@code onDestroyedByPlayer} hook (NeoForge), rather than leaving it to the hook (Forge 1.20.1).
+     */
+    default boolean gameModeCallsPlayerWillDestroy() {
+        return false;
+    }
+
     /** One mod file (a jar, or a folder in a dev run) and the mods in it. */
     interface ModFiles {
         Set<String> modIds();
