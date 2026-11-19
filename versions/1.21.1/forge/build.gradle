@@ -39,6 +39,12 @@ configurations {
     verifyCompileOnly.extendsFrom compileOnly
 }
 
+// The dev runs' launcher (Forge's Slime Launcher) asks for a Java 8 install by default, only to learn its Java
+// version; give it the build's Java 21 instead (the runs need 21 anyway).
+fgtools.configure('slimelauncher') {
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+}
+
 minecraft {
     mappings channel: 'official', version: forge_minecraft_version
 

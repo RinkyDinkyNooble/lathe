@@ -55,6 +55,15 @@ final class ForgePlatform implements Platform {
         return TOOL_TAGS;
     }
 
+    /**
+     * No: Forge 52's ServerPlayerGameMode.destroyBlock and MultiPlayerGameMode.destroyBlock drop vanilla's
+     * playerWillDestroy call and leave it to onDestroyedByPlayer (IForgeBlock's default calls it), as Forge 1.20.1 did.
+     */
+    @Override
+    public boolean gameModeCallsPlayerWillDestroy() {
+        return false;
+    }
+
     private record ForgeModFiles(IModFile file, Set<String> modIds) implements ModFiles {
         ForgeModFiles(IModFileInfo info) {
             this(info.getFile(), ids(info));
