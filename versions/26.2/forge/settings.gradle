@@ -1,0 +1,11 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven { url = 'https://maven.minecraftforge.net/' }
+    }
+}
+
+// Lathe for Forge, Minecraft 26.2: a build of its own, as the 1.21.x and 26.1 Forge builds, with the Gradle that Forge's
+// 26.2 MDK uses (9.5). It compiles ../common in, as the other loaders do, and reads the group's shared mod info from
+// ../gradle.properties.
+rootProject.name = 'lathe-forge-26.2'
