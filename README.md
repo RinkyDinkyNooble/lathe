@@ -1,12 +1,21 @@
 # Lathe
 
-Lathe is a mod for modpack makers, for Forge and Fabric. It makes slabs, vertical slabs, stairs, vertical stairs, corners, quarters and eighths for the blocks you list, and only those. Each shape is a real block with its own stable id, looks like its source block, mines and sounds like it, and can be used in Lost Cities palettes.
+Lathe is a mod for modpack makers, for Forge, NeoForge and Fabric. It makes slabs, vertical slabs, stairs, vertical stairs, corners, quarters and eighths for the blocks you list, and only those. Each shape is a real block with its own stable id, looks like its source block, mines and sounds like it, and can be used in Lost Cities palettes.
 
 It was made for the ABZA modpack, whose city palettes use BetterBlockZ (1,498 full blocks, no slabs or stairs), but it works with any mod's full blocks.
 
-- Minecraft 1.20.1 on Forge 47.4.10 or later
-- Minecraft 1.20 or 1.20.1 on Fabric Loader 0.15 or later, with Fabric API 0.83 or later; also runs on Quilt with Quilted Fabric API
-- The same rules files, ids and block states on both loaders
+| Minecraft | Fabric (with Fabric API) | NeoForge | Forge | Java |
+|---|---|---|---|---|
+| 1.20, 1.20.1 | Loader 0.15+, Fabric API 0.83+; also Quilt | none | 47.4.10+ (1.20.1 only) | 17 |
+| 1.21, 1.21.1 | Loader 0.15.11+, Fabric API 0.100.0+; also Quilt (alpha Quilted Fabric API) | 21.0.143+ | 51+ on 1.21, 52+ on 1.21.1 | 21 |
+| 1.21.11 | Loader 0.17.3+, Fabric API 0.139.4+ | 21.11.42+ | 61+ | 21 |
+| 26.1, 26.1.1, 26.1.2 | Loader 0.18.4+, Fabric API 0.144.0+ | 26.1.0.1-beta+ | 62+ | 25 |
+| 26.2 | Loader 0.18.4+, Fabric API 0.152.1+ | 26.2.0.0-beta+ | 65+ | 25 |
+| 26.3 | Loader 0.19.3+, Fabric API 0.160.5+ | 26.3.0.0-beta+ | 66+ | 25 |
+
+- One jar per loader and row, named `lathe-<loader>-<minecraft>-<version>.jar`: `lathe-neoforge-1.21.1-0.3.0.jar` covers 1.21 and 1.21.1, `lathe-fabric-26.1-0.3.0.jar` covers 26.1 to 26.1.2. Minecraft 1.21.2 to 1.21.10 have no jar.
+- Quilt only where a Quilted Fabric API exists: 1.20.x, and 1.21 and 1.21.1 with QFAPI 11.0.0-alpha.3 (an alpha). There's none for 1.21.11 or 26.x.
+- The same rules files, ids and block states on every loader and version (see [Loaders and versions](#loaders-and-versions))
 - Needed on both the client and the server, with the same rules (see [Same rules on both sides](#same-rules-on-both-sides))
 - License: 0BSD
 
@@ -24,7 +33,7 @@ It was made for the ABZA modpack, whose city palettes use BetterBlockZ (1,498 fu
 - [Same rules on both sides](#same-rules-on-both-sides)
 - [Startup log](#startup-log)
 - [Scalpel](#scalpel)
-- [Fabric](#fabric)
+- [Loaders and versions](#loaders-and-versions)
 - [Limits](#limits)
 - [Building and testing](#building-and-testing)
 - [Inspiration](#inspiration)
@@ -194,6 +203,12 @@ Lathe writes the blockstate and model files for every shape into a resource pack
 
 The source model is found by reading its blockstate (the default state's variant) and following its model's parents, from the mods' jars. Render layers that a mod sets in code rather than in its model are copied too.
 
+Newer Minecraft versions moved some of this, and Lathe follows each one, so the shapes look the same on every version:
+
+- **1.21.4 and later:** an item's tint lives in its item definition (`assets/<mod>/items/`). Each shape's item copies the tints of its source item's definition.
+- **26.1 and later:** there are no code-set render layers any more; a face's layer comes from its texture (a texture can be marked `force_translucent`, as vanilla's glass is). The shapes copy the source's textures with that mark. Block tints are a list per tint index, which the shapes look up from the source when drawn.
+- **26.3:** `"shade": false` became `"shade_direction_override"`, copied from the source like the rest.
+
 Names come from the source's name in the game's language: "Calcite Slab", "Calcite Vertical Stairs". English names are also written into the generated pack for anything that shows raw translation keys.
 
 ## Recipes, loot and tags
@@ -202,8 +217,8 @@ Generated into a data pack held in memory, always on:
 
 - **Stonecutter**, from the source: 2 slabs, 1 stairs, 2 vertical slabs (when they have their own item), 1 vertical stairs, 1 corner, 4 quarters, 8 eighths. Quarters and eighths have no recipe back.
 - **Crafting**: two slabs back into the source block (stacked; side by side for vertical slabs with their own item).
-- **Loot**: each shape drops itself (every corner, quarter and eighth drops one of itself); a double slab drops two; explosions may destroy some, as with vanilla slabs.
-- **Tags**: `minecraft:slabs` and `minecraft:stairs` (blocks and items); `lostcities:rotatable` for vertical slabs, vertical stairs, corners, quarters and eighths (none of these are in `minecraft:slabs` or `minecraft:stairs`); the source's tool tags (`minecraft:mineable/*`, `minecraft:needs_*_tool`, and on Forge `forge:needs_*_tool`, on Fabric `fabric:needs_tool_level_*` and `fabric:mineable/*`), read from the tag files in every mod's jar, nested tags included.
+- **Loot**: each shape drops itself (every corner, quarter and eighth drops one of itself); a double slab drops two; explosions may destroy some, as with vanilla slabs. (26.3 changed the loot table format; Lathe writes the new one, with the same drops.)
+- **Tags**: `minecraft:slabs` and `minecraft:stairs` (blocks and items); `lostcities:rotatable` for vertical slabs, vertical stairs, corners, quarters and eighths (none of these are in `minecraft:slabs` or `minecraft:stairs`); the source's tool tags (`minecraft:mineable/*`, `minecraft:needs_*_tool`, and on Forge `forge:needs_*_tool`, on NeoForge `neoforge:needs_*_tool`, on Fabric `fabric:needs_tool_level_*` and `fabric:mineable/*`), read from the tag files in every mod's jar, nested tags included.
 
 Sources without an item get no recipes.
 
@@ -211,10 +226,11 @@ Sources without an item get no recipes.
 
 The shapes are registry entries, so a client and a server with different rules can't play together: the loader's registry sync refuses the connection. Ship `config/lathe/` to both, like any other config.
 
-Lathe also compares a hash of the rules (comments and spacing don't count) when a player joins, which is clearer than a list of missing blocks. The hash is in the startup log.
+Lathe also compares a hash of the rules (comments and spacing don't count) when a player joins, which is clearer than a list of missing blocks. The hash is in the startup log. It depends only on the rules, so the same rules give the same hash on every loader and version.
 
-- **Forge**: a network channel, `lathe:rules`, versioned by the hash. When the rules differ, Forge's disconnect screen names that channel with both hashes.
+- **Forge 1.20.1**: a network channel, `lathe:rules`, versioned by the hash. When the rules differ, Forge's disconnect screen names that channel with both hashes.
 - **Fabric**: the server asks the client for its hash while it logs in. When they differ, the player is disconnected with both hashes and "The client and the server need the same config/lathe/ rules". A server whose rules make no shapes doesn't ask, so vanilla clients can still join it.
+- **NeoForge, and Forge 1.21 and later**: the same exchange in the connection's configuration phase, before the loader's registry sync (on NeoForge one mixin puts it first), with the same messages as Fabric's. A client without Lathe is told "This server uses Lathe. Install Lathe with the same config/lathe/ rules as the server (rules hash ...)." A server whose rules make no shapes doesn't ask. The channel is optional both ways, so a client with Lathe can still join a server without it (on Forge 1.20.1, Forge's own channel check refused that).
 
 ## Startup log
 
@@ -229,6 +245,8 @@ Lathe: 41 shapes for 18 blocks
 
 ## Scalpel
 
+Scalpel is a Forge 1.20.1 mod, so this section applies there only.
+
 Lathe and [Scalpel](https://github.com/RinkyDinkyNooble/scalpel) work together in any load order: Scalpel cuts each block as it registers, and Lathe reads its source blocks after every mod has registered.
 
 - A source block Scalpel **removes** doesn't exist, so Lathe warns `unknown block` and makes nothing for it.
@@ -236,27 +254,69 @@ Lathe and [Scalpel](https://github.com/RinkyDinkyNooble/scalpel) work together i
 - A source block Scalpel **hides** is still a normal block, so its shapes are made as usual. Hide the shapes too with a Scalpel rule on their ids (`hide block lathe:minecraft__calcite_*`).
 - Scalpel rules can cut Lathe's own shapes like any other mod's content.
 
-## Fabric
+## Loaders and versions
 
-The Fabric version is the same mod: the same rules files, ids, block states, placing, recipes, drops and tags, from the same code. What differs is how it hooks in:
+Every jar is the same mod: the same rules files, ids, block states, placing, recipes, drops and tags, from the same code. What differs is how each loader hooks in, and the few things below a player could notice. The dev checks compare every jar's screenshots with the others' pixel by pixel; apart from what's listed here, Lathe's blocks, items and outlines look the same on every loader and version (each Minecraft version's own lighting and sky changes aside: 26.1 draws the whole world a little brighter than 1.21, vanilla blocks too).
+
+### Fabric
 
 - **When shapes are made.** Fabric has no "every mod has registered" moment, so Lathe makes a block's shapes the moment that block registers, whichever mod registers it and whenever. The startup log's summary comes once every mod has started.
-- **Render layers.** Fabric mods set a block's render layer in code, not in its model; each shape gets its source's layer from there.
+- **Render layers.** Up to 1.21.11, Fabric mods set a block's render layer in code, not in its model; each shape gets its source's layer from there. From 26.1 on, layers come from textures on every loader (see [Looks](#looks)).
 - **Packs.** The generated resource and data packs are always on, as on Forge. On Fabric the resource pack shows in the pack list as "Lathe's shapes", fixed in place.
-- **Reach.** Choosing which half of a double slab breaks uses vanilla's reach (Forge uses its reach attribute).
-- **Lost Cities.** McJty's The Lost Cities is Forge-only; its [Fabric port](https://www.curseforge.com/minecraft/mc-mods/lostcities-fabric) by sunshainy reads the same palettes, and Lathe's checks generate and rotate cities with it. That port needs Minecraft 1.20.1: on 1.20 it needs a newer Fabric API than 1.20 has, so it doesn't start there (Lathe itself does).
-- **Scalpel** is Forge-only, so the [Scalpel](#scalpel) section doesn't apply.
+- **Reach.** Choosing which half of a double slab breaks uses vanilla's reach (Forge 1.20.1 uses its reach attribute). From 1.21 on every loader uses vanilla's block reach attribute: 4.5 blocks, 5 in creative, unless a mod changes it.
+- **Lost Cities.** McJty's The Lost Cities has Fabric builds of its own from 26.2 on. Before that, its [Fabric port](https://www.curseforge.com/minecraft/mc-mods/lostcities-fabric) by sunshainy reads the same palettes, for 1.20.1, 1.21.1 and 1.21.11, and Lathe's checks generate and rotate cities with it.
+  - On 1.20 the port needs a newer Fabric API than 1.20 has, so it doesn't start there (Lathe itself does).
+  - The port's 1.21.1 build (1.2.0) keeps its block tags in the pre-1.21 folder `tags/blocks/`, which 1.21 no longer reads, so its own `lostcities:rotatable` entries (`#minecraft:stairs`, `#minecraft:doors`) are lost: stairs, vanilla's and Lathe's, don't turn with rotated buildings there. Lathe's vertical slabs, vertical stairs, corners, quarters and eighths still turn (Lathe adds them to the tag itself). Lathe doesn't patch the port; its 1.21.11 build has the tags in the right folder.
+  - No Lost Cities exists for Fabric 26.1, so Lathe's Lost Cities support is untested on that jar (the same code passes on the others).
+- **Quilt.** The Fabric jar runs on Quilt with Quilted Fabric API, checked on real Quilt servers: 1.20.1, and 1.21 and 1.21.1 with QFAPI 11.0.0-alpha.3 (the only QFAPI for 1.21.x, an alpha; Quilt Loader 0.25 or later). No QFAPI exists for 1.21.11 or 26.x.
+- **Scalpel** is Forge 1.20.1 only, so the [Scalpel](#scalpel) section doesn't apply.
+
+### NeoForge
+
+- **When shapes are made.** As on Forge: once every mod has registered its blocks (Lathe listens on the last mod's registry event).
+- **Rules check.** Lathe's exchange runs before NeoForge's registry sync, so a client with different rules sees Lathe's message with both hashes rather than NeoForge's list of unknown registry entries (see [Same rules on both sides](#same-rules-on-both-sides)).
+- **Packs** are hidden from the pack screens, as on Forge.
+- **Half-breaking.** NeoForge's game modes call `playerWillDestroy` themselves, so Lathe doesn't call it again (each break plays its sound and particles once). On 1.21.11 and later this goes through NeoForge's newer `onDestroyedByPlayer` hook.
+- **Lost Cities.** McJty's own, on every version. Only 26.1.2 has a 26.1 build, and its 26.2 and 26.3 builds need NeoForge 26.2.0.75 and 26.3.0.83 or later (newer than Lathe needs).
+- **Shaders on 1.21.x.** With Iris running a shader pack (ABZA Shader in the checks), the faces of light-emitting shapes that lie inside the block's cell (the step of a froglight stair, the inner faces of a corner) are shaded instead of glowing, while Fabric shows them glowing. The faces are identical on both loaders with shaders off, and the models come from the same code, so it most likely comes from the NeoForge side of Iris with that shader; not proven. It doesn't happen on NeoForge 26.x.
+- **Sodium on 26.3** (not Lathe): Sodium 0.9.2 doesn't start on NeoForge 26.3.0.65 or later; the checks ran Sodium 0.9.3-beta.1 with Iris 1.11.7.
+
+### Forge
+
+- **1.21 and later: the rules check** works as on Fabric and NeoForge, with the same messages (see [Same rules on both sides](#same-rules-on-both-sides)); a client without Lathe is told the server uses Lathe.
+- **Packs** stay hidden from the pack screens on every Forge version. Forge 66 (Minecraft 26.3) stopped reading a pack's own hidden flag, so there Lathe sets Forge's.
+- **No Lost Cities after 1.20.1.** McJty's builds for 1.21 and later are NeoForge (and from 26.2, Fabric) only, so Lathe's Lost Cities checks can't run on Forge 1.21 and later.
+- **No renderer or shader mods after 1.20.1.** Embeddium and Oculus stop at Forge 1.20.1; Sodium and Iris are Fabric and NeoForge only. Only unofficial ports exist, and they weren't tested. So Lathe on Forge 1.21 and later is checked with the vanilla renderer only.
+- **Forge's own lighting** (not Lathe): Forge 61 and later light some vertices next to light-blocking blocks a little brighter than NeoForge and Fabric do, vanilla blocks too.
 
 ## Limits
 
 - Only full-cube sources. Shapes of a block's own non-cube model (a lamp, a plate) aren't made.
 - Shapes look like the source's default state. A source with several looks (a log's axis, a block with a facing) gives its shapes the default one: upright for logs and pillars.
 - Connected textures (CTM and similar) and custom model loaders aren't followed; the plain cube element is copied. Use the texture options for those.
+- Only the source model's first full-cube element is copied. A source with a second, overlay element (the grass block's tinted side overlay) gives shapes without the overlay: their sides show the base texture alone.
+- Under Sodium on 26.x, a source whose model uses tint index 4 or higher shows that face untinted on its shapes (Sodium copies each block's tint list at startup, before the source's list is known, so Lathe gives it 4 slots). Vanilla models use indexes 0 and 1.
 - A resource pack that changes which texture the source's *model* uses (rather than the texture itself) isn't followed: the model is read from the mod's jar.
 - A source with its own glass culling hides its faces only against itself, so a glass block shows a faint inner face against its own shapes. Shapes hide their faces against the glass block and each other.
 - Two different slabs in one block, walls and fences aren't made.
+- Untested where the other mod doesn't exist: Lost Cities on Forge 1.21 and later and on Fabric 26.1; renderers and shaders on Forge 1.21 and later. See [Loaders and versions](#loaders-and-versions) for the Lost Cities Fabric port's 1.21.1 tag folder and the NeoForge 1.21.x shader difference.
 
 ## Building and testing
+
+The repo holds six Gradle builds: the root one for Minecraft 1.20.x, and one in `versions/` for each later row of the table at the top.
+
+| Build | Minecraft | Gradle | Fabric | NeoForge | Forge | JDK |
+|---|---|---|---|---|---|---|
+| root | 1.20, 1.20.1 | 8.8 | Loom 1.7.4 | none | ForgeGradle 6 | 17 |
+| `versions/1.21.1/` | 1.21, 1.21.1 | 8.14.3 | Loom 1.13.6 | ModDevGradle 2.0.148 | ForgeGradle 7.0.40 on Gradle 9.5.1 | 21 |
+| `versions/1.21.11/` | 1.21.11 | 9.2.1 | Loom 1.15.5 | ModDevGradle 2.0.148 | ForgeGradle 7.0.40 on Gradle 9.5.1 | 21 |
+| `versions/26.1/` | 26.1 to 26.1.2 | 9.4.1 | Loom 1.15.5, not remapping | ModDevGradle 2.0.148 | ForgeGradle 7.0.40 on Gradle 9.5.1 | 25 |
+| `versions/26.2/` | 26.2 | 9.5.1 | Loom 1.17.21, not remapping | ModDevGradle 2.0.148 | ForgeGradle 7.0.40 on Gradle 9.5.1 | 25 |
+| `versions/26.3/` | 26.3 | 9.5.1 | Loom 1.17.21, not remapping | ModDevGradle 2.0.148 | ForgeGradle 7.0.40 on Gradle 9.7.1 | 25 |
+
+Minecraft 26.x is unobfuscated, so its Fabric builds use Loom's non-remapping plugin (`net.fabricmc.fabric-loom`). NeoForge and Forge run Mojang's names from 1.21 on, so nothing is reobfuscated there either.
+
+### The root build (1.20.x)
 
 ```
 gradlew build
@@ -264,7 +324,7 @@ gradlew build
 
 JDK 17. The jars are `forge-1.20.1/build/libs/lathe-forge-1.20.1-<version>.jar` and `fabric-1.20.1/build/libs/lathe-fabric-1.20.1-<version>.jar`.
 
-The code lives in three folders. `common/` holds everything the loaders share (the rules, the blocks, placing, the generated packs, the client's outlines) and isn't built on its own: each port folder compiles it into its own jar. `forge-1.20.1/` and `fabric-1.20.1/` hold what each loader does its own way: the entry point, registering the shapes, adding the packs, client events, and a small `Platform` with the rest. A port for another loader or Minecraft version is another such folder.
+The code lives in three folders. `common/` holds everything the loaders share (the rules, the blocks, placing, the generated packs, the client's outlines) and isn't built on its own: each port folder compiles it into its own jar. `forge-1.20.1/` and `fabric-1.20.1/` hold what each loader does its own way: the entry point, registering the shapes, adding the packs, client events, and a small `Platform` with the rest. Ports for Minecraft 1.21 and later live in `versions/` (below).
 
 The dev runs need mods that aren't in the repo:
 
@@ -276,6 +336,38 @@ Dev-only checks live in `common/src/verify` (shared) and each port's `src/verify
 - `gradlew runVerifyServer` starts a headless server in `run-server/` with the rules in `run-server/config/lathe/`, runs the checks, writes `run-server/lathe-verify.txt` and stops. It checks every shape of every rule against its source (hardness, light, sound, map colour, tool needs, see-through-ness, mining speed and harvesting with several tools, tool tags), that no shape ticks or has a block entity, loot for every state, stonecutter and crafting recipes, slab, stairs and Lost Cities tags, the placement maths, placing and half-breaking with a player in the world (drops counted), and that nothing about Lathe was logged as an error. For corners it checks all 32 pieces' shapes, that rotating and mirroring each one turns its eighths the same way, the placing maths, and placing in the world: upside-down stairs along a wall with vertical stairs below, with and without sneaking, in all four rotations, with Lathe's and vanilla stairs, then by aim on an open floor and beside a single slab. For quarters and eighths it checks all 12 and 8 pieces the same way, the aim maths on floors, ceilings and walls (and that every piece can be reached), and fitting in the world in all four rotations: both kinds of L of vertical slabs (a pole, or vertical stairs with the vertical stairs item), a beam continued end-on, a pole and vertical stairs stacked, three slabs meeting (an eighth), sneaking going by aim, neighbours calling for some other piece, water and drops. Then it swaps some of Lost Cities' default palette entries for Lathe shapes with states (corners, quarters and eighths mixed in), generates 160 Lost Cities building chunks, counts the shapes placed, and runs Lost Cities' own rotation code on them.
 - `gradlew runVerifyClient` (add `-PwithRenderers` for Embeddium and Oculus) joins `run/saves/lathe-test` (a copy of the verify server's world), checks that every state of every shape has a model whose faces use the source's textures, shading, tint, ambient occlusion and render layer, checks item models and names, builds a gallery of every shape next to its source, of all 32 corner pieces, and of all 12 quarters and 8 eighths, takes screenshots into `run/screenshots/`, and places and half-breaks through the real client: an outer corner and (sneaking) an inner corner where stairs meet vertical stairs, two poles closing an L of vertical slabs (next to the same L left empty), a beam along a floor-wall edge continued end-on, and an eighth where three slabs meet. It writes `run/lathe-verify-client.txt` and quits.
 - `gradlew :fabric-1.20.1:remapVerifyJar` builds the Fabric checks as a mod of their own (`fabric-1.20.1/build/libs/lathe-fabric-1.20.1-<version>-verify.jar`). Put it with Lathe's jar in a real Fabric or Quilt server's `mods/`, with the vanilla test rules, Lost Cities' Fabric port and Forge Config API Port, and start the server with `-Dlathe.verify=true`: it runs the same server checks on the real game, writes `lathe-verify.txt` and stops.
+
+### `versions/` (1.21 and later)
+
+Each `versions/<group>/` is a build of its own, with its own wrapper:
+
+- `common/`: the shared code for that group's Minecraft version, compiled into each loader's jar, as the root's `common/` is. Each group's `common/` started as a copy of the one before it (root, 1.21.1, 1.21.11, 26.1, 26.2, 26.3) plus that version's changes, so a fix to one has to be carried into the later ones by hand.
+- `fabric/` and `neoforge/`: projects of the group's build, each with its own `gradle.properties` (loader and API versions, the claimed ranges, the dev-run mods). The mod's own details (name, version, license) are in `versions/<group>/gradle.properties`, the same as the root's.
+- `forge/`: a build of its own (its own `settings.gradle` and wrapper), because ForgeGradle 7 needs Gradle 9.3 or later. It reads the group's `gradle.properties` and compiles `../common` in.
+
+Build with the JDK from the table, from the group's folder (`versions/26.3` here):
+
+```
+gradlew --configure-on-demand :fabric:build
+gradlew --configure-on-demand :neoforge:build
+cd forge
+gradlew build
+```
+
+The jars are `<loader>/build/libs/lathe-<loader>-<group>-<version>.jar`, for example `versions/26.3/forge/build/libs/lathe-forge-26.3-0.3.0.jar`. `--configure-on-demand` sets up only the loader asked for (on 1.21.1 the Fabric project needs its `libs/` jar, below, even to be configured). Forge's first build takes about five minutes while ForgeGradle makes the game jar.
+
+The dev runs need these mods, none of which ship with Lathe:
+
+- **Fabric 1.21.1**: the Lost Cities Fabric port 1.2.0 for 1.21.1 in `versions/1.21.1/fabric/libs/lostcities-fabric-1.2.0.jar`, with the `Fabric-Loom-Version` line taken out of its manifest, as for the root build. Forge Config API Port, Sodium and Iris come from Modrinth's maven.
+- **Fabric 1.21.11 and later, and NeoForge**: everything from Modrinth's maven, by the version ids in `<loader>/gradle.properties` (version numbers repeat across Minecraft versions). Fabric 26.1 has no Lost Cities, since none exists; setting `lostcities_fabric_project` and `lostcities_fabric_version` there adds one if it appears.
+- **Forge 1.21 and later**: none. No Lost Cities, renderer or shader mod exists for it.
+
+The checks are the root's, carried along with each group's `common/src/verify`, plus each loader's glue in `<loader>/src/verify`. On every loader they're a mod of their own, `latheverify`, never shipped. All three loaders use the vanilla test rules. Fabric and NeoForge tasks run from the group (`gradlew --configure-on-demand :neoforge:runVerifyServer`), Forge's from `forge/` (`gradlew runVerifyServer`).
+
+- **`runVerifyServer`**, with the test rules in `<loader>/run-server/config/lathe/`. Expect **11,877 passed, 0 failed**: the 1.20.1 count plus 4 checks that each break plays its sound, particles and `block_destroy` event once. Without Lost Cities (Forge, Fabric 26.1) expect **11,726 passed, 15 failed**: the 15 are the Lost Cities lines, saying it isn't installed, and its 136 generation checks don't run.
+- **`runVerifyClient`**, on a copy of the verify server's world in `<loader>/run/saves/lathe-test` (delete its `session.lock`). Expect **30,095 passed, 0 failed** on every loader and version. `-PwithRenderers` adds Sodium and Iris on Fabric and NeoForge; on NeoForge `-PsodiumVersion=` and `-PirisVersion=` pick others, and those runs turn off NeoForge's dev-only draw validation and warning screens, as a player has them.
+- **Rules check**: `runServer`, then a client joining `localhost:25565` from `<loader>/run-join/`: `runJoinClient` on Fabric and NeoForge, `runVerifyClient -Pjoin` on Forge. It writes `run-join/lathe-verify-join.txt` (JOINED, or DISCONNECTED with the screen's text). Add one rule to `run-join/config/lathe/` for the refused case. Forge 1.21.1, 26.1 and 26.3 also have `runWithoutLatheClient`, a Forge client without Lathe (folder `run-without-lathe/`), which the server should refuse with "This server uses Lathe...". NeoForge's and Forge's dev servers don't read the console, so end `runServer`'s process to stop it.
+- **Real servers**: `verifyJar` (`remapVerifyJar` on Fabric 1.21.x) builds `lathe-<loader>-<group>-<version>-verify.jar`. Put it with Lathe's jar in a real server's `mods/`, with the vanilla test rules and (where it exists) Lost Cities, and start the server with `-Dlathe.verify=true`, as for 1.20.1. Every loader range in the table at the top was checked this way, on each Minecraft version it claims, with the oldest loader and Fabric API it claims and with the newest.
 
 ## Inspiration
 

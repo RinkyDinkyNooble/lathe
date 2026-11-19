@@ -1,6 +1,6 @@
 # Lathe
 
-Lathe makes **slabs, vertical slabs, stairs, vertical stairs, corners, quarters and eighths for the blocks you choose**, from any mod. List the blocks in a small rules file and each one gets real shaped blocks that <span style="color:#2dc26b"><strong>look, sound and mine like the original</strong></span>, with recipes, drops and tags. It's for modpacks whose builders and city palettes need shapes that the block's own mod never added.
+Lathe makes **slabs, vertical slabs, stairs, vertical stairs, corners, quarters and eighths for the blocks you choose**, from any mod. List the blocks in a small rules file and each one gets real shaped blocks that <span style="color:#2dc26b"><strong>look, sound and mine like the original</strong></span>, with recipes, drops and tags. It's for modpacks whose builders and city palettes need shapes that the block's own mod never added. It runs on **Forge, NeoForge, Fabric and Quilt**, with the same rules files and block ids on each.
 
 ***
 
@@ -8,8 +8,10 @@ Lathe makes **slabs, vertical slabs, stairs, vertical stairs, corners, quarters 
 
 <table>
   <tr><th align="left">What</th><th align="left">Version</th></tr>
-  <tr><td><strong>Forge</strong></td><td>47.4.10 or later</td></tr>
-  <tr><td><strong>Fabric</strong></td><td>Loader 0.15 or later, with <a href="https://www.curseforge.com/minecraft/mc-mods/fabric-api">Fabric API</a> (on Quilt, Quilted Fabric API)</td></tr>
+  <tr><td><strong>Forge</strong></td><td>47.4.10 or later, or any Forge from 51 on</td></tr>
+  <tr><td><strong>NeoForge</strong></td><td>21.0.143 or later (on 21.11, 21.11.42 or later)</td></tr>
+  <tr><td><strong>Fabric</strong></td><td>Loader 0.15 or later (newer files need a newer Loader), with <a href="https://www.curseforge.com/minecraft/mc-mods/fabric-api">Fabric API</a></td></tr>
+  <tr><td><strong>Quilt</strong></td><td>With Quilted Fabric API, on the files marked Quilt</td></tr>
   <tr><td><strong>Sides</strong></td><td><span style="color:#e03e2d"><strong>Client and server</strong></span>, with the same rules files</td></tr>
 </table>
 
@@ -92,7 +94,7 @@ slab vstairs minecraft:glass nocombine
 
 Every shape has an id that never changes, like `lathe:minecraft__calcite_stairs`, so Lost Cities palettes can use them with a state (`[facing=north,half=bottom]`). Stairs, vertical slabs, vertical stairs, corners, quarters and eighths turn with the parts Lost Cities rotates. Corners, quarters and eighths never change shape when their neighbours change, so they stay as the palette says.
 
-On Fabric, the same works with the [Fabric port of The Lost Cities](https://www.curseforge.com/minecraft/mc-mods/lostcities-fabric).
+It works on every loader The Lost Cities exists for, and on Fabric also with the [Fabric port of The Lost Cities](https://www.curseforge.com/minecraft/mc-mods/lostcities-fabric).
 
 ***
 
