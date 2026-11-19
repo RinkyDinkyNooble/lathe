@@ -97,12 +97,22 @@ public final class VerifyClient {
      * screen; press its Proceed button so the run doesn't wait for a person.
      */
     private static void proceedPastExperimentalWarning(Minecraft mc) {
-        if (!(mc.screen instanceof net.minecraft.client.gui.screens.ConfirmScreen screen)) return;
+        // 1.20.1 shows a ConfirmScreen with Proceed; 1.21 a BackupConfirmScreen whose "I know what I'm doing!" loads
+        // the world without a backup.
+        String proceed;
+        if (mc.screen instanceof net.minecraft.client.gui.screens.ConfirmScreen) {
+            proceed = net.minecraft.network.chat.CommonComponents.GUI_PROCEED.getString();
+        } else if (mc.screen instanceof net.minecraft.client.gui.screens.BackupConfirmScreen) {
+            proceed = net.minecraft.network.chat.Component.translatable("selectWorld.backupJoinSkipButton").getString();
+        } else {
+            return;
+        }
+        var screen = mc.screen;
         if (!screen.getTitle().getString().contains("Experimental")) return;
         for (var child : screen.children()) {
             if (child instanceof net.minecraft.client.gui.components.Button button
-                    && button.getMessage().getString().equals(net.minecraft.network.chat.CommonComponents.GUI_PROCEED.getString())) {
-                Lathe.LOG.info("[verify] pressing Proceed on the experimental settings warning");
+                    && button.getMessage().getString().equals(proceed)) {
+                Lathe.LOG.info("[verify] pressing '{}' on the experimental settings warning", proceed);
                 button.onPress();
                 return;
             }
