@@ -21,6 +21,8 @@ import com.rinkynooble.lathe.pack.Packs;
 import com.rinkynooble.lathe.pack.ModResources;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -56,6 +58,11 @@ import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
+import net.minecraft.world.level.gameevent.BlockPositionSource;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.gameevent.GameEventListener;
+import net.minecraft.world.level.gameevent.GameEventListenerRegistry;
+import net.minecraft.world.level.gameevent.PositionSource;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.AABB;
@@ -700,12 +707,14 @@ public final class VerifyServer {
         BlockState left = level.getBlockState(pos);
         report.check(left.is(slab) && left.getValue(SlabBlock.TYPE) == SlabType.BOTTOM, "breaking a double slab from above leaves the bottom (got " + left + ")");
         report.check(dropped(level, pos, slabItem) == 1, "breaking half a double slab drops one slab (got " + dropped(level, pos, slabItem) + ")");
+        report.check(lastDestroyEvents == 1, "breaking half a double slab plays the break once (got " + lastDestroyEvents + ")");
 
         // Looking up from below: the bottom half breaks.
         breakAt(level, player, pos, slab.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.DOUBLE),
                 new Vec3(pos.getX() + 0.5, pos.getY() - 2.6, pos.getZ() + 0.5), -90.0F);
         left = level.getBlockState(pos);
         report.check(left.is(slab) && left.getValue(SlabBlock.TYPE) == SlabType.TOP, "breaking a double slab from below leaves the top (got " + left + ")");
+        report.check(lastDestroyEvents == 1, "breaking the bottom half of a double slab plays the break once (got " + lastDestroyEvents + ")");
 
         // A double vertical slab split north-south, looked at from the south: the south half breaks.
         breakAt(level, player, pos, vslab.defaultBlockState().setValue(LatheVerticalSlabBlock.FACING, Direction.NORTH)
@@ -715,11 +724,13 @@ public final class VerifyServer {
         report.check(left.is(vslab) && left.getValue(LatheVerticalSlabBlock.FACING) == Direction.NORTH
                 && left.getValue(LatheVerticalSlabBlock.TYPE) == VerticalSlabType.SINGLE, "breaking a double vertical slab from the south leaves the north half (got " + left + ")");
         report.check(dropped(level, pos, slabItem) == 1, "breaking half a double vertical slab drops one slab item (got " + dropped(level, pos, slabItem) + ")");
+        report.check(lastDestroyEvents == 1, "breaking half a double vertical slab plays the break once (got " + lastDestroyEvents + ")");
 
         // A single slab breaks whole.
         breakAt(level, player, pos, slab.defaultBlockState(), new Vec3(pos.getX() + 0.5, pos.getY() + 2.6, pos.getZ() + 0.5), 90.0F);
         report.check(level.getBlockState(pos).isAir(), "breaking a single slab removes it");
         report.check(dropped(level, pos, slabItem) == 1, "a single slab drops one (got " + dropped(level, pos, slabItem) + ")");
+        report.check(lastDestroyEvents == 1, "breaking a single slab plays the break once (got " + lastDestroyEvents + ")");
         reset(level, pos.below());
     }
 
@@ -733,7 +744,48 @@ public final class VerifyServer {
         level.setBlock(pos, state, 3);
         player.snapTo(feet.x, feet.y, feet.z, yaw, pitch);
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.DIAMOND_PICKAXE));
-        player.gameMode.destroyBlock(pos);
+        DestroyEvents events = new DestroyEvents(pos);
+        GameEventListenerRegistry listeners = level.getChunkAt(pos).getListenerRegistry(SectionPos.blockToSectionCoord(pos.getY()));
+        listeners.register(events);
+        try {
+            player.gameMode.destroyBlock(pos);
+        } finally {
+            listeners.unregister(events);
+        }
+        lastDestroyEvents = events.count;
+    }
+
+    /** How many block_destroy game events the last {@link #breakAt} posted at its block: one per playerWillDestroy. */
+    static int lastDestroyEvents;
+
+    /**
+     * Counts the block_destroy game events at a block. playerWillDestroy posts one along with the break particles
+     * and sound, so a break that calls it twice (the game mode and Lathe's hook both) shows up as 2.
+     */
+    private static final class DestroyEvents implements GameEventListener {
+        private final BlockPos pos;
+        int count;
+
+        DestroyEvents(BlockPos pos) {
+            this.pos = pos;
+        }
+
+        @Override
+        public PositionSource getListenerSource() {
+            return new BlockPositionSource(pos);
+        }
+
+        @Override
+        public int getListenerRadius() {
+            return 1;
+        }
+
+        @Override
+        public boolean handleGameEvent(ServerLevel level, Holder<GameEvent> event, GameEvent.Context context, Vec3 at) {
+            if (!event.is(GameEvent.BLOCK_DESTROY) || !BlockPos.containing(at).equals(pos)) return false;
+            count++;
+            return true;
+        }
     }
 
     static int dropped(ServerLevel level, BlockPos pos, Item item) {
