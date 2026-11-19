@@ -7,6 +7,7 @@ import com.rinkynooble.lathe.block.ShapeBlock;
 import com.rinkynooble.lathe.item.LatheBlockItem;
 import com.rinkynooble.lathe.item.LatheSlabItem;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.color.block.BlockTintSource;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.ShapeRenderer;
@@ -45,54 +46,68 @@ public final class LatheClient {
         return new SourceTints(material.source.defaultBlockState());
     }
 
-    /** The source's tint sources, each turned into one for the shape (see {@link #blockTints}). */
-    private static final class SourceTints extends AbstractList<BlockTintSource> {
-        private record Seen(List<BlockTintSource> source, List<BlockTintSource> shape) {
-        }
+    /**
+     * Tint slots kept for a reader that copies the list before the game's block colours exist. Sodium copies each
+     * block's list when it's registered, which is while the block colours are being made, so it can't see the
+     * source's yet; it gets this many slots, each looking up the source's tint at that index when drawn. Vanilla
+     * models use tint indexes 0 and 1.
+     */
+    private static final int EARLY_SLOTS = 4;
 
+    /**
+     * The source's tint sources as the shape's (see {@link #blockTints}): as many as the source has, each the
+     * source's tint at that index. Each entry looks the source's tint up when it's used, so the list stays right
+     * whenever the source's tints are registered, and a copy taken early (Sodium) still colours like the source.
+     */
+    private static final class SourceTints extends AbstractList<BlockTintSource> {
         private final BlockState source;
-        private volatile Seen seen = new Seen(null, List.of());
+        private final BlockTintSource[] slots = new BlockTintSource[EARLY_SLOTS];
 
         SourceTints(BlockState source) {
             this.source = source;
-        }
-
-        private List<BlockTintSource> current() {
-            List<BlockTintSource> list = Minecraft.getInstance().getBlockColors().getTintSources(source);
-            Seen last = seen;
-            if (last.source() != list) {
-                last = new Seen(list, list.stream().map(tint -> (BlockTintSource) new SourceTint(source, tint)).toList());
-                seen = last;
-            }
-            return last.shape();
+            for (int i = 0; i < EARLY_SLOTS; i++) slots[i] = new SourceTint(source, i);
         }
 
         @Override
         public BlockTintSource get(int index) {
-            return current().get(index);
+            if (index < 0) throw new IndexOutOfBoundsException(index);
+            return index < EARLY_SLOTS ? slots[index] : new SourceTint(source, index);
         }
 
         @Override
         public int size() {
-            return current().size();
+            // While the block colours are being made (only an early copy asks then), the fixed slots.
+            BlockColors colors = Minecraft.getInstance().getBlockColors();
+            return colors == null ? EARLY_SLOTS : colors.getTintSources(source).size();
         }
     }
 
-    /** One of the source's tint sources, always asked about the source's default state. */
-    private record SourceTint(BlockState source, BlockTintSource tint) implements BlockTintSource {
+    /**
+     * The source's tint at one index, always asked about the source's default state. White (no change) when the
+     * source has none there, as the game draws a tint index past the end of a block's list.
+     */
+    private record SourceTint(BlockState source, int index) implements BlockTintSource {
+        private BlockTintSource tint() {
+            BlockColors colors = Minecraft.getInstance().getBlockColors();
+            return colors == null ? null : colors.getTintSource(source, index);
+        }
+
         @Override
         public int color(BlockState state) {
-            return tint.color(source);
+            BlockTintSource tint = tint();
+            return tint == null ? -1 : tint.color(source);
         }
 
         @Override
         public int colorInWorld(BlockState state, BlockAndTintGetter level, BlockPos pos) {
-            return tint.colorInWorld(source, level, pos);
+            BlockTintSource tint = tint();
+            return tint == null ? -1 : tint.colorInWorld(source, level, pos);
         }
 
         @Override
         public int colorAsTerrainParticle(BlockState state, BlockAndTintGetter level, BlockPos pos) {
-            return tint.colorAsTerrainParticle(source, level, pos);
+            BlockTintSource tint = tint();
+            return tint == null ? -1 : tint.colorAsTerrainParticle(source, level, pos);
         }
 
         @Override
