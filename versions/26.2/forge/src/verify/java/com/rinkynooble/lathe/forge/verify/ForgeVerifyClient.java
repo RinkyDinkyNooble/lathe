@@ -101,6 +101,7 @@ public final class ForgeVerifyClient implements VerifyClientPlatform {
 
     @Override
     public String renderers() {
-        return "Embeddium loaded: " + ModList.isLoaded("embeddium") + ", Oculus loaded: " + ModList.isLoaded("oculus");
+        return "Sodium or Embeddium loaded: " + (ModList.isLoaded("sodium") || ModList.isLoaded("embeddium"))
+                + ", Iris or Oculus loaded: " + (ModList.isLoaded("iris") || ModList.isLoaded("oculus"));
     }
 }
