@@ -1,6 +1,7 @@
 package com.rinkynooble.lathe.forge;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.rinkynooble.lathe.Lathe;
 import com.rinkynooble.lathe.Material;
 import com.rinkynooble.lathe.Registration;
 import com.rinkynooble.lathe.block.ShapeBlock;
@@ -33,9 +34,11 @@ import net.minecraftforge.client.event.RenderHighlightEvent;
 import net.minecraftforge.eventbus.api.bus.BusGroup;
 import net.minecraftforge.fml.event.lifecycle.FMLLoadCompleteEvent;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /** Client-only setup on Forge: colours, render layers, and the placement and half-breaking outlines. */
 final class ForgeClient {
@@ -62,14 +65,40 @@ final class ForgeClient {
     @SuppressWarnings("deprecation") // Forge prefers the model's render types; these are the code-set ones
     private static void onLoadComplete(FMLLoadCompleteEvent event) {
         event.enqueueWork(() -> {
+            Map<Block, ChunkSectionLayer> vanillaLayers = vanillaLayers();
             for (Material material : Registration.MATERIALS.values()) {
-                Collection<ChunkSectionLayer> layers = ItemBlockRenderTypes.getRenderLayers(material.source.defaultBlockState());
-                if (layers.isEmpty() || (layers.size() == 1 && layers.contains(ChunkSectionLayer.SOLID))) continue;
-                List<ChunkSectionLayer> list = new ArrayList<>(layers);
-                ChunkSectionLayer[] rest = list.subList(1, list.size()).toArray(ChunkSectionLayer[]::new);
-                for (Block block : material.blocks.values()) ItemBlockRenderTypes.setRenderLayer(block, list.get(0), rest);
+                BlockState source = material.source.defaultBlockState();
+                Collection<ChunkSectionLayer> layers = ItemBlockRenderTypes.getRenderLayers(source);
+                if (!layers.isEmpty() && !(layers.size() == 1 && layers.contains(ChunkSectionLayer.SOLID))) {
+                    List<ChunkSectionLayer> list = new ArrayList<>(layers);
+                    ChunkSectionLayer[] rest = list.subList(1, list.size()).toArray(ChunkSectionLayer[]::new);
+                    for (Block block : material.blocks.values()) ItemBlockRenderTypes.setRenderLayer(block, list.get(0), rest);
+                }
+                ChunkSectionLayer vanilla = ItemBlockRenderTypes.getChunkRenderType(source);
+                if (vanillaLayers != null && vanilla != ChunkSectionLayer.SOLID) {
+                    for (Block block : material.blocks.values()) vanillaLayers.put(block, vanilla);
+                }
             }
         });
+    }
+
+    /**
+     * Forge's setRenderLayer fills only Forge's own table, which the chunk renderer reads. Vanilla code still reads
+     * its own table (getChunkRenderType): the render type of block items (a glass shape's item is drawn translucent
+     * only if its block is TRANSLUCENT there), moving and falling blocks, and the outline's pass. Forge has no setter
+     * for it, so Lathe copies the source's entry into it directly, as the Fabric and NeoForge jars do through their
+     * loaders. Null (and a log line) if it can't be reached; then those items are drawn as on any Forge mod.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<Block, ChunkSectionLayer> vanillaLayers() {
+        try {
+            Field field = ItemBlockRenderTypes.class.getDeclaredField("TYPE_BY_BLOCK");
+            field.setAccessible(true);
+            return (Map<Block, ChunkSectionLayer>) field.get(null);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            Lathe.LOG.warn("Lathe: couldn't reach vanilla's block render layers; glass shapes' items may look solid", e);
+            return null;
+        }
     }
 
     /**

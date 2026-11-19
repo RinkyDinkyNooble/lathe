@@ -84,8 +84,14 @@ public final class ForgeVerifyClient implements VerifyClientPlatform {
         return model.getRenderTypes(state, random, ModelData.EMPTY).toString();
     }
 
+    /**
+     * Neither Sodium/Embeddium nor Iris/Oculus has a Forge build for 1.21.11 (checked 2026-11-19), so the checks run
+     * with the vanilla renderer; the line names either family in case one turns up.
+     */
     @Override
     public String renderers() {
-        return "Embeddium loaded: " + ModList.get().isLoaded("embeddium") + ", Oculus loaded: " + ModList.get().isLoaded("oculus");
+        ModList mods = ModList.get();
+        return "Sodium or Embeddium loaded: " + (mods.isLoaded("sodium") || mods.isLoaded("embeddium"))
+                + ", Iris or Oculus loaded: " + (mods.isLoaded("iris") || mods.isLoaded("oculus"));
     }
 }
